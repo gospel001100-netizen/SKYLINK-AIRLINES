@@ -147,22 +147,75 @@ app.get('/t/:code', (req,res)=>{
   res.send(`<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font-family:Arial;background:#eef2f7;margin:0;padding:18px}.card{max-width:520px;margin:auto;background:white;padding:20px;border-radius:16px}.status{background:#00205b;color:white;padding:12px;border-radius:12px;text-align:center;font-weight:800}</style></head><body><div class="card"><h2>✈️ SKYLINK LIVE ${b.flightNumber}</h2><p>${b.name} | ${b.fromCode}→${b.toCode} | Seat ${b.seat}</p><p><b>Dep:</b> ${fDep}<br><b>Arr:</b> ${fArr}</p><div class="status">${status}</div><p>${info}</p><div style="background:#eee;height:8px;border-radius:10px"><div style="background:#00205b;height:8px;width:${pct}%;border-radius:10px"></div></div><p><small>Tracking ${req.params.code}</small></p></div><script>setTimeout(()=>location.reload(),30000)</script></body></html>`);
 });
 
-app.get('/admin', (req,res)=>{
-  if(req.query.pass!=='skylink123') return res.send('<form><input name="pass" type="password" placeholder="Password"><button>Login</button></form>');
-  let pendingList=Object.entries(bookings).filter(x=> x[1].pending &&!x[1].paid);
-  let pendingRows=pendingList.map(e=>`<tr><td>${e[0]}<br>${e[1].name}<br>${e[1].email}</td><td>${e[1].from}→${e[1].to}</td><td><a href="/admin/approve/${e[0]}?pass=skylink123" style="background:green;color:white;padding:10px;display:block;text-align:center;border-radius:8px;text-decoration:none">APPROVE & SEND EMAIL</a></td></tr>`).join('')||'<tr><td colspan=3>No pending</td></tr>';
-  res.send(`<h1>ADMIN - ${allAirportsList.length} airports</h1><table border=1 width=100% style="background:white"><tr><th>Passenger</th><th>Route</th><th>Action</th></tr>${pendingRows}</table>`);
-});
-
-app.get('/admin/approve/:code', async (req,res)=>{
-  if(req.query.pass!=='skylink123') return res.send('No');
-  let b=bookings[req.params.code]; if(!b) return res.send('Not found');
-  b.paid=true; b.pending=false; saveBookings();
-  let fp=await generateCleanPDF(req.params.code, b);
-  if(transporter && b.email){
-    try{ await transporter.sendMail({ from:'"SKYLINK AIRLINES" <'+process.env.EMAIL_USER+'>', to:b.email, subject:'CONFIRMED Boarding Pass '+req.params.code, html:`<h2>Hi ${b.name}, Your flight ${b.flightNumber} ${b.fromCode}→${b.toCode} CONFIRMED Seat ${b.seat} Track: https://skylink-airlines.onrender.com/t/${req.params.code}</h2>`, attachments: fp?[{filename:'BoardingPass-'+req.params.code+'.pdf', path:fp}]:[] }); }catch(e){ console.log(e); }
-  }
-  res.redirect('/admin?pass=skylink123');
+// NEW SKYLINK ADMIN - PERMANENT TRACKING
+app.get('/skylink-admin-panel', (req, res) => {
+  res.send(`
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Skylink Admin</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI,sans-serif}
+body{background:#f4f7fb;min-height:100vh}
+.login-wrapper{display:flex;justify-content:center;align-items:center;min-height:100vh;background:linear-gradient(135deg,#0a1931 0%,#185adb 100%)}
+.login-card{background:#fff;padding:40px 35px;border-radius:16px;width:95%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.login-card h1{color:#0a1931;font-size:24px;margin-bottom:8px;text-align:center}
+.login-card p{color:#666;font-size:14px;text-align:center;margin-bottom:25px}
+.login-card input{width:100%;padding:14px;border:1.5px solid #ddd;border-radius:10px;font-size:16px;margin-bottom:15px}
+.login-card button{width:100%;padding:14px;background:#185adb;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer}
+.error{background:#ffebee;color:#c62828;padding:10px;border-radius:8px;font-size:13px;margin-bottom:15px;display:none}
+.header{background:#0a1931;color:#fff;padding:18px 25px;display:flex;justify-content:space-between;align-items:center}
+.container{padding:20px;max-width:1200px;margin:0 auto}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-bottom:25px}
+.stat-card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.06);border-left:4px solid #185adb}
+.stat-card h3{font-size:13px;color:#888;text-transform:uppercase}
+.stat-card p{font-size:28px;font-weight:700;color:#0a1931;margin-top:5px}
+.table-wrap{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+table{width:100%;border-collapse:collapse}th{background:#f8f9fa;text-align:left;padding:12px 15px;font-size:12px;color:#666;text-transform:uppercase}td{padding:14px 15px;border-top:1px solid #f0f0f0;font-size:14px}
+.code{font-family:monospace;background:#eef2ff;padding:4px 8px;border-radius:6px;font-weight:700;color:#185adb}
+.badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#e8f5e9;color:#2e7d32}
+</style></head><body>
+<div id="loginPage" class="login-wrapper">
+<div class="login-card">
+<div style="text-align:center;font-size:32px;margin-bottom:20px">✈️</div>
+<h1>Skylink Admin</h1><p>Secure access - Authorized only</p>
+<div id="err" class="error">Incorrect password</div>
+<input type="password" id="pwd" placeholder="Enter admin password">
+<button onclick="doLogin()">Login to Dashboard</button>
+</div></div>
+<div id="dashPage" style="display:none">
+<div class="header"><h2>✈️ SKYLINK ADMIN PANEL</h2><a href="#" onclick="logout()" style="background:#185adb;color:#fff;padding:8px 16px;border-radius:8px;text-decoration:none;font-size:13px">Logout</a></div>
+<div class="container">
+<div class="stats">
+<div class="stat-card"><h3>Total Bookings</h3><p id="total">0</p></div>
+<div class="stat-card"><h3>Total Revenue</h3><p id="revenue">₦0</p></div>
+<div class="stat-card"><h3>Today's Bookings</h3><p id="today">0</p></div>
+<div class="stat-card"><h3>Tracking Active</h3><p style="color:#2e7d32">✓ Permanent</p></div>
+</div>
+<div class="table-wrap" style="padding:20px">
+<h3>All Passenger Records & Permanent Tracking Codes</h3>
+<div style="overflow-x:auto;margin-top:15px"><table><thead><tr><th>Tracking Code</th><th>Passenger</th><th>Route</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody id="tbody"><tr><td colspan="6" style="text-align:center;padding:30px;color:#999">Loading...</td></tr></tbody></table></div>
+</div></div></div>
+<script>
+const ADMIN_PASS="Gos008800";
+function doLogin(){const v=document.getElementById('pwd').value;if(v===ADMIN_PASS){localStorage.setItem('skylink_admin_auth','true');showDash()}else{document.getElementById('err').style.display='block'}}
+function showDash(){document.getElementById('loginPage').style.display='none';document.getElementById('dashPage').style.display='block';loadBookings()}
+function logout(){localStorage.removeItem('skylink_admin_auth');location.reload()}
+if(localStorage.getItem('skylink_admin_auth')==='true'){showDash()}
+async function loadBookings(){
+ try{
+  const res=await fetch('/api/bookings');
+  const data=await res.json();
+  let rev=0; data.forEach(b=>rev+=(b.amount||b.price||0));
+  document.getElementById('total').innerText=data.length;
+  document.getElementById('revenue').innerText='₦'+rev.toLocaleString();
+  document.getElementById('today').innerText=data.length;
+  document.getElementById('tbody').innerHTML=data.map(b=>'<tr><td><span class=code>'+(b.bookingReference||b.trackingCode||b.code||'SKY-'+(b._id||'').slice(-6).toUpperCase())+'</span></td><td>'+(b.name||b.passengerName||b.email||'Passenger')+'</td><td>'+(b.from||'')+' '+(b.from?'→':'')+' '+(b.to||b.destination||'')+'</td><td>'+(b.date||'').toString().slice(0,10)+'</td><td>₦'+(b.amount||b.price||0).toLocaleString()+'</td><td><span class=badge>PAID</span></td></tr>').join('');
+ }catch(e){
+  document.getElementById('tbody').innerHTML='<tr><td colspan=6 style=\"text-align:center;padding:20px\">Connect /api/bookings route to see real bookings. Your DB is safe!</td></tr>';
+ }
+}
+</script></body></html>
+  `);
 });
 
 app.get('/track', (req,res)=>{ if(!req.query.code) return res.send('Enter code'); res.redirect('/t/'+req.query.code); });
