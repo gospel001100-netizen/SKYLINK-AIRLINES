@@ -1,4 +1,4 @@
-// server.js - SKYLINK FINAL V3 - Professional Ticket + Isolated Tracking + Real Duration + Normal View
+// server.js - SKYLINK FINAL V4 - Real-Time Tracking Fix + Download HD + Copy Fix - Maintained V3
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
@@ -133,7 +133,7 @@ app.get('/skylink-admin-logout', (req,res)=>{ res.setHeader('Set-Cookie', 'admin
 app.get('/', (req,res)=>{
   const aj = JSON.stringify(AIRPORTS);
   const pk = process.env.PAYSTACK_PUBLIC_KEY || 'pk_live_d820c59c33c0628f48f10176e8ff25b243fd6c73';
-  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>SKYLINK AIRLINES</title><script src="https://js.paystack.co/v1/inline.js"></script><style>
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>SKYLINK AIRLINES</title><script src="https://js.paystack.co/v1/inline.js"><\/script><style>
 *{box-sizing:border-box} html{font-size:16px}
 body{margin:0;font-family:Inter,Arial;background:#f1f5f9;padding:0;display:block}
 .wrapper{width:100%;min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:12px}
@@ -147,7 +147,7 @@ label{font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;mar
 input{width:100%;padding:15px 16px;border-radius:12px;border:1.5px solid #e2e8f0;font-size:16px;font-weight:600;background:#f8fafc;color:#000;outline:none}
 input:focus{background:#fff;border-color:#0f2e6d}
 .btn-main{width:100%;background:#0f2e6d;color:#fff;padding:16px;border-radius:12px;border:none;font-weight:800;font-size:16px;margin-top:18px;cursor:pointer}
-.track-row{display:flex;gap:8px;margin-top:14px}
+.track-row{display:flex;gap:8px;margin-top:14px;align-items:center}
 .btn-track{background:#16a34a;color:#fff;border:none;padding:14px 20px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer}
 .suggest{position:absolute;background:#fff;border:1px solid #e2e8f0;border-radius:10px;max-height:180px;overflow:auto;width:100%;z-index:20;display:none;box-shadow:0 10px 30px rgba(0,0,0,.1)}
 .suggest div{padding:10px 12px;font-size:13px;font-weight:700;cursor:pointer;border-bottom:1px solid #f1f5f9}
@@ -155,6 +155,7 @@ input:focus{background:#fff;border-color:#0f2e6d}
 #step2{display:none}
 .warning{background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:12px;font-weight:800;font-size:13px;color:#92400E;text-align:center;margin-bottom:12px}
 .summary{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;font-size:14px;line-height:1.6;margin-bottom:12px}
+.copy-btn{background:#0f2e6d;color:#fff;border:none;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;margin-left:6px}
 </style></head><body><div class="wrapper"><div class="card">
 <div class="header"><div class="pill">✈️ SKYLINK <span>AIRLINES</span></div></div>
 <div class="sub">OFFICIAL BOOKING PORTAL</div>
@@ -167,11 +168,12 @@ input:focus{background:#fff;border-color:#0f2e6d}
 <label>Departure Date & Time *</label><input type="datetime-local" id="depart" required>
 <button class="btn-main" type="submit">Continue →</button>
 </form>
-<div class="track-row"><input id="trk" placeholder="TRK-XXXXXXX" style="flex:1;background:#fff;padding:14px;border-radius:10px;border:1.5px solid #e2e8f0"><button class="btn-track" onclick="if(document.getElementById('trk').value) location.href='/track?code='+document.getElementById('trk').value">Track</button></div>
+<div class="track-row"><input id="trk" placeholder="TRK-XXXXXXX" style="flex:1;background:#fff;padding:14px;border-radius:10px;border:1.5px solid #e2e8f0"><button class="btn-track" onclick="copyAndTrack()">Copy & Track</button><button class="btn-track" style="background:#0f2e6d" onclick="if(document.getElementById('trk').value) location.href='/track?code='+document.getElementById('trk').value.trim()">Track</button></div>
+<div id="copyMsg" style="font-size:11px;color:#16a34a;font-weight:800;text-align:center;margin-top:6px;display:none">Copied!</div>
 </div>
 <div id="step2">
 <div class="summary" id="summary"></div>
-<div class="warning">WARNING!!! Transfer this exact amount: <b>NGN 2,150</b> - Do not pay more or less to avoid booking failure.</div>
+<div class="warning">WARNING!!! Transfer this exact amount: <b>NGN 2,150</b> - Do not pay more or less to avoid booking failure. <br><br><span style="display:inline-flex;align-items:center">Ref: <b id="payRef" style="margin-left:4px">SKY-</b> <button class="copy-btn" onclick="copyText(document.getElementById('payRef').innerText)">Copy</button></span></div>
 <button class="btn-main" id="payBtn" onclick="payWithPaystack()">Pay NGN 2,150 & Generate Boarding Pass</button>
 <button class="btn-main" style="background:#fff;color:#0f2e6d;border:1.5px solid #0f2e6d;margin-top:8px" onclick="backToForm()">← Back</button>
 </div>
@@ -194,6 +196,32 @@ function selectAirport(t,c){
   document.getElementById(t).dataset.code=c;
   document.getElementById(t+"-suggest").style.display="none";
 }
+function copyText(text){
+  if(!text) return;
+  try{
+    if(navigator.clipboard && window.isSecureContext){
+      navigator.clipboard.writeText(text).then(()=>{showCopyMsg("Copied: "+text)}).catch(()=>{fallbackCopy(text);});
+    }else{ fallbackCopy(text); }
+  }catch(e){ fallbackCopy(text); }
+}
+function fallbackCopy(text){
+  const ta=document.createElement("textarea");
+  ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try{ document.execCommand('copy'); showCopyMsg("Copied: "+text); }catch(e){ showCopyMsg(text+" (long press to copy)"); }
+  document.body.removeChild(ta);
+}
+function showCopyMsg(msg){
+  const el=document.getElementById("copyMsg");
+  el.innerText=msg; el.style.display="block";
+  setTimeout(()=> el.style.display="none", 2500);
+}
+function copyAndTrack(){
+  const v=document.getElementById('trk').value.trim();
+  if(!v){alert("Enter Tracking Code");return}
+  copyText(v);
+  setTimeout(()=>{ location.href='/track?code='+v; }, 400);
+}
 function goToPayment(e){
   e.preventDefault();
   const name=document.getElementById("pname").value.trim();
@@ -202,8 +230,10 @@ function goToPayment(e){
   const to=document.getElementById("to").dataset.code||document.getElementById("to").value.split(" ")[0].toUpperCase();
   const depart=document.getElementById("depart").value;
   if(!name||!email||!from||!to||!depart){alert("Fill all fields");return}
-  pendingPayload={name,email,from,to,depart,class:"ECONOMY"};
-  document.getElementById("summary").innerHTML="<b>Passenger:</b> "+name+"<br><b>Route:</b> "+from+" → "+to+"<br><b>Departure:</b> "+new Date(depart).toLocaleString()+"<br><b>Amount:</b> NGN 2,150";
+  const ref = "SKY-" + Math.floor(Math.random()*1000000000);
+  document.getElementById("payRef").innerText = ref;
+  pendingPayload={name,email,from,to,depart,class:"ECONOMY", tempRef: ref};
+  document.getElementById("summary").innerHTML="<b>Passenger:</b> "+name+"<br><b>Route:</b> "+from+" → "+to+"<br><b>Departure:</b> "+new Date(depart).toLocaleString()+"<br><b>Amount:</b> NGN 2,150<br><b>Ref:</b> "+ref+" <button class='copy-btn' onclick='copyText(\\""+ref+"\\")'>Copy</button>";
   document.getElementById("step1").style.display="none";
   document.getElementById("step2").style.display="block";
 }
@@ -218,15 +248,15 @@ function payWithPaystack(){
       email: pendingPayload.email,
       amount: 2150 * 100,
       currency: "NGN",
-      ref: "SKY-" + Math.floor(Math.random()*1000000000),
+      ref: document.getElementById("payRef").innerText || "SKY-" + Math.floor(Math.random()*1000000000),
       onClose: function(){ btn.innerText="Pay NGN 2,150 & Generate Boarding Pass"; btn.disabled=false; },
       callback: function(response){
         btn.innerText="Payment successful! Generating ticket...";
         pendingPayload.paystackRef = response.reference;
         fetch("/api/book",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(pendingPayload)})
-    .then(function(r){return r.json()})
-    .then(function(d){ if(d.boardingUrl){ window.location = d.boardingUrl; } else { alert(d.error||"Failed"); btn.disabled=false; } })
-    .catch(function(err){ alert("Error: "+err.message); btn.disabled=false; });
+   .then(function(r){return r.json()})
+   .then(function(d){ if(d.boardingUrl){ window.location = d.boardingUrl; } else { alert(d.error||"Failed"); btn.disabled=false; } })
+   .catch(function(err){ alert("Error: "+err.message); btn.disabled=false; });
       }
     });
     handler.openIframe();
@@ -254,18 +284,17 @@ app.post('/api/book', async (req,res)=>{
   res.json({boardingUrl:'/boarding-pass?code='+tracking});
 });
 
-// ADMIN SAME AS BEFORE
 app.get('/skylink-admin-gospel-2024', async (req,res)=>{
   if(!isAuthenticated(req)){ return res.redirect('/skylink-admin-login'); }
   let all=[];const seen=new Set();
   if(BookingModel){ try{ const docs=await BookingModel.find({}).sort({createdAt:-1}); docs.forEach(v=>{ if(!seen.has(v.tracking)){seen.add(v.tracking);all.push(v)} }); }catch(e){} }
   try{const obj=JSON.parse(fs.readFileSync(DATA_FILE,'utf8')||'{}');Object.values(obj).forEach(v=>{if(!seen.has(v.tracking)){seen.add(v.tracking);all.push(v)}})}catch(e){}
   const total = all.length * 2150; const today = all.filter(b=> b.createdAt && new Date(b.createdAt).toDateString() === new Date().toDateString()).length;
-  let rows = all.map(b=>`<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:14px;font-weight:800;color:#0f2e6d">${b.booking}</td><td style="padding:14px"><span style="background:#e0f2fe;color:#0c4a6e;padding:4px 10px;border-radius:20px;font-weight:800;font-size:11px">${b.tracking}</span></td><td style="padding:14px;font-weight:700">${b.name}</td><td style="padding:14px;font-weight:700">${b.from} → ${b.to} <br><span style="font-size:10px;color:#16a34a">${b.durationMins? Math.floor(b.durationMins/60)+'h '+(b.durationMins%60)+'m':''}</span></td><td style="padding:14px;font-weight:900;color:#16a34a">NGN 2,150</td><td style="padding:14px;font-size:11px">${b.paystackRef||''}</td><td style="padding:14px;font-size:11px">${b.createdAt? new Date(b.createdAt).toLocaleString():''}</td><td style="padding:14px"><a href="/boarding-pass?code=${b.tracking}" style="background:#0f2e6d;color:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;font-size:11px;font-weight:800">View Pass</a></td></tr>`).join('');
+  let rows = all.map(b=>`<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:14px;font-weight:800;color:#0f2e6d">${b.booking}</td><td style="padding:14px"><span style="background:#e0f2fe;color:#0c4a6e;padding:4px 10px;border-radius:20px;font-weight:800;font-size:11px">${b.tracking}</span> <button onclick="navigator.clipboard.writeText('${b.tracking}')" style="border:none;background:#0f2e6d;color:#fff;padding:3px 6px;border-radius:4px;font-size:9px;cursor:pointer">Copy</button></td><td style="padding:14px;font-weight:700">${b.name}</td><td style="padding:14px;font-weight:700">${b.from} → ${b.to} <br><span style="font-size:10px;color:#16a34a">${b.durationMins? Math.floor(b.durationMins/60)+'h '+(b.durationMins%60)+'m':''}</span></td><td style="padding:14px;font-weight:900;color:#16a34a">NGN 2,150</td><td style="padding:14px;font-size:11px">${b.paystackRef||''} <button onclick="navigator.clipboard.writeText('${b.paystackRef||''}')" style="border:none;background:#0f2e6d;color:#fff;padding:3px 6px;border-radius:4px;font-size:9px;cursor:pointer">Copy</button></td><td style="padding:14px;font-size:11px">${b.createdAt? new Date(b.createdAt).toLocaleString():''}</td><td style="padding:14px"><a href="/boarding-pass?code=${b.tracking}" style="background:#0f2e6d;color:#fff;padding:6px 12px;border-radius:8px;text-decoration:none;font-size:11px;font-weight:800">View Pass</a></td></tr>`).join('');
   res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>SKYLINK Admin</title><style>body{margin:0;font-family:Inter,Arial;background:#f1f5f9}.header{background:#0f2e6d;color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:center}.card{max-width:1200px;margin:20px auto;background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.06);overflow:hidden;border:1px solid #e2e8f0}.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:20px}.stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px}.stat h3{margin:0;font-size:11px;color:#64748b}.stat p{margin:6px 0 0;font-size:22px;font-weight:900}.table-wrap{overflow:auto} table{width:100%;border-collapse:collapse;min-width:900px} th{background:#f8fafc;text-align:left;padding:12px 14px;font-size:11px;color:#64748b;border-bottom:2px solid #e2e8f0} a.logout{background:#ef4444;color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:800;font-size:12px}</style></head><body><div class="header"><div><div style="font-weight:900;font-size:20px">✈️ SKYLINK AIRLINES - ADMIN</div><div style="font-size:11px;opacity:0.8">Real Money Dashboard - Private</div></div><div><a class="logout" href="/skylink-admin-logout">Logout</a></div></div><div class="card"><div class="stats"><div class="stat"><h3>TOTAL BOOKINGS</h3><p>${all.length}</p></div><div class="stat"><h3>TOTAL REVENUE</h3><p style="color:#16a34a">NGN ${total.toLocaleString()}</p></div><div class="stat"><h3>TODAY</h3><p>${today}</p></div></div><div style="padding:0 20px 10px;font-weight:900">All Bookings - Paystack Verified</div><div class="table-wrap"><table><tr><th>BOOKING</th><th>TRACKING</th><th>PASSENGER</th><th>ROUTE</th><th>AMOUNT</th><th>PAYSTACK REF</th><th>DATE</th><th>ACTION</th></tr>${rows || '<tr><td colspan=8 style="padding:40px;text-align:center;color:#94a3b8">No bookings yet</td></tr>'}</table></div></div></body></html>`);
 });
 
-// NEW PROFESSIONAL BOARDING PASS - EXACTLY LIKE YOUR SAMPLE
+// BOARDING PASS - BRIGHT HD + DOWNLOAD BUTTON - FIXED
 app.get('/boarding-pass', async (req,res)=>{
   const code=req.query.code;let b=bookings.get(code);
   if(!b && BookingModel){try{const doc=await BookingModel.findOne({$or:[{tracking:code},{booking:code}]});if(doc)b=doc.toObject()}catch(e){}}
@@ -280,31 +309,38 @@ app.get('/boarding-pass', async (req,res)=>{
   const arriveStr = new Date(b.arriveISO).toLocaleString('en-US',{month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true}) + ' - ' + b.toTz;
   res.send(`
 <html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Boarding Pass ${b.booking}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
 <style>
-*{box-sizing:border-box} body{margin:0;background:#e5e7eb;font-family:Arial,Helvetica,sans-serif;display:flex;justify-content:center;padding:0}
-.ticket{width:100%;max-width:900px;background:#fff;margin:0;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+*{box-sizing:border-box} body{margin:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;padding:0}
+.ticket-wrap{width:100%;max-width:900px;background:#ffffff;margin:0;box-shadow:none}
+.ticket{background:#ffffff!important; border:3px solid #1a2b5e; filter: brightness(1.15) contrast(1.1);}
 .header{background:#1a2b5e;color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:flex-start}
 .header-left h1{margin:0;font-size:28px;font-weight:900;letter-spacing:0.5px}.header-left h1 span{color:#facc15}.header-left.sub{font-size:10px;letter-spacing:1px;margin-top:4px;opacity:0.9}
 .header-right{font-size:11px;opacity:0.8;text-align:right}
-.content{padding:20px 24px;display:grid;grid-template-columns:1fr 200px;gap:20px}
-.label{font-size:10px;color:#6b7280;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-top:14px}
-.value{font-size:14px;font-weight:800;color:#111827;margin-top:2px;word-break:break-word}
-.big-name{font-size:18px;font-weight:900}
+.content{padding:20px 24px;display:grid;grid-template-columns:1fr 200px;gap:20px;background:#ffffff}
+.label{font-size:10px;color:#000;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;margin-top:14px;opacity:0.6}
+.value{font-size:14px;font-weight:900;color:#000;margin-top:2px;word-break:break-word}
+.big-name{font-size:18px;font-weight:900;color:#000}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:6px}
-.box{border:1px solid #e5e7eb;border-radius:0;padding:0}
 .status-green{color:#16a34a;font-weight:900}
-.qr-box{border:1.5px solid #1a2b5e;padding:10px;text-align:center;background:#fff}
-.qr-box img{width:100%;max-width:180px;height:auto}
+.qr-box{border:2px solid #1a2b5e;padding:10px;text-align:center;background:#ffffff}
+.qr-box img{width:100%;max-width:180px;height:auto;filter: brightness(1.2) contrast(1.2);}
 .qr-link{font-size:8px;color:#1a2b5e;word-break:break-all;margin-top:6px;font-weight:600}
-.bottom-bar{background:#1a2b5e;color:#cbd5e1;padding:8px 24px;font-size:8px;text-align:center;letter-spacing:0.5px}
-.stub{padding:10px 24px;background:#fff;border-top:2px dashed #9ca3af;font-size:10px;font-weight:800}
+.bottom-bar{background:#1a2b5e;color:#fff;padding:8px 24px;font-size:8px;text-align:center;letter-spacing:0.5px;font-weight:700}
+.stub{padding:10px 24px;background:#fff;border-top:2px dashed #1a2b5e;font-size:10px;font-weight:800;color:#000}
+.btn-area{padding:16px 24px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;background:#f8fafc;border-top:1px solid #e2e8f0}
+.btn-dl{background:#16a34a;color:#fff;border:none;padding:14px 22px;border-radius:10px;font-weight:900;font-size:14px;cursor:pointer;box-shadow:0 4px 12px rgba(22,163,74,.3)}
+.btn-track{background:#0f2e6d;color:#fff;border:none;padding:14px 22px;border-radius:10px;font-weight:900;font-size:14px;cursor:pointer}
+.btn-copy{background:#fff;color:#0f2e6d;border:1.5px solid #0f2e6d;padding:14px 22px;border-radius:10px;font-weight:900;font-size:14px;cursor:pointer}
 @media(max-width:700px){.content{grid-template-columns:1fr}.qr-box{order:-1}}
+@media print{.btn-area{display:none} body{background:#fff}.ticket{border:none;box-shadow:none} }
 </style>
 </head><body>
+<div class="ticket-wrap" id="ticketCapture">
 <div class="ticket">
   <div class="header">
     <div class="header-left"><h1>SKYLINK<span>AIRLINES</span></h1><div class="sub">IATA CERTIFIED • EST. 2018 • OFFICIAL BOARDING PASS</div></div>
-    <div class="header-right">${host}</div>
+    <div class="header-right">${host}<br>${b.tracking} <button onclick="copyRobust('${b.tracking}')" style="background:#fff;color:#1a2b5e;border:none;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800;cursor:pointer;margin-left:4px">COPY</button></div>
   </div>
   <div class="content">
     <div>
@@ -323,108 +359,207 @@ app.get('/boarding-pass', async (req,res)=>{
         <div><div class="label">BAGGAGE</div><div class="value">${b.baggage}</div></div>
       </div>
       <div class="grid3" style="margin-top:12px">
-        <div><div class="label">TRACKING CODE</div><div class="value">${b.tracking}</div></div>
+        <div><div class="label">TRACKING CODE</div><div class="value">${b.tracking} <button onclick="copyRobust('${b.tracking}')" style="background:#1a2b5e;color:#fff;border:none;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800;cursor:pointer">COPY</button></div></div>
         <div><div class="label">STATUS</div><div class="value status-green">CONFIRMED / CONFIRME</div></div>
       </div>
       <div style="margin-top:16px">
         <div class="label">DEPARTURE / DEPART</div><div class="value">${departStr}</div>
         <div class="label">ARRIVAL / ARRIVEE</div><div class="value">${arriveStr}</div>
       </div>
-      <div style="margin-top:16px;font-size:11px;line-height:1.5">
+      <div style="margin-top:16px;font-size:11px;line-height:1.5;color:#000;font-weight:600">
         <b>AIRCRAFT:</b> Boeing 737-800 | <b>DURATION:</b> ${durH}h ${durM.toString().padStart(2,'0')}m | <b>MEAL:</b> Included<br>
         <b>IMPORTANT:</b> Present this boarding pass with valid ID at check-in counter 2 hours before departure. Boarding closes 45 mins before.
       </div>
     </div>
     <div class="qr-box">
-      ${qr? `<img src="${qr}">` : `<div style="width:180px;height:180px;background:#f3f4f6;display:flex;align-items:center;justify-content:center">QR</div>`}
-      <div style="font-size:10px;font-weight:800;margin-top:8px">SCAN TO TRACK LIVE FLIGHT STATUS</div>
+      ${qr? `<img src="${qr}">` : `<div style="width:180px;height:180px;background:#fff;display:flex;align-items:center;justify-content:center;border:1px solid #000">QR</div>`}
+      <div style="font-size:10px;font-weight:900;margin-top:8px;color:#000">SCAN TO TRACK LIVE FLIGHT STATUS</div>
       <div class="qr-link">${trackLink}</div>
+      <button onclick="copyRobust('${trackLink}')" style="margin-top:6px;background:#1a2b5e;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:9px;font-weight:800;cursor:pointer">COPY LINK</button>
     </div>
   </div>
   <div class="bottom-bar">This is an official e-ticket issued by SKYLINK AIRLINES. Non-transferable. Subject to conditions of carriage.</div>
   <div class="stub">BOARDING PASS STUB - KEEP WITH YOU<br>${b.name} | ${b.flight} | ${b.from} ${b.to} | SEAT ${b.seat} | GATE ${b.gate} | TERMINAL ${b.terminal} | ${b.tracking}</div>
 </div>
+</div>
+
+<div class="btn-area">
+  <button class="btn-dl" onclick="downloadHD()">⬇️ Download Boarding Pass (Bright HD)</button>
+  <button class="btn-track" onclick="location.href='/track?code=${b.tracking}'">📍 Live Track</button>
+  <button class="btn-copy" onclick="copyRobust('${b.tracking}')">Copy Tracking Code</button>
+</div>
+<div id="msg" style="font-size:12px;font-weight:800;color:#16a34a;margin-bottom:20px;display:none;text-align:center"></div>
+
+<script>
+function copyRobust(text){
+  try{
+    if(navigator.clipboard && window.isSecureContext){
+      navigator.clipboard.writeText(text).then(()=>{showMsg("✅ Copied: "+text)}).catch(()=>{fallback(text)});
+    }else{ fallback(text); }
+  }catch(e){ fallback(text); }
+}
+function fallback(text){
+  const ta=document.createElement("textarea");
+  ta.value=text; ta.style.position="fixed"; ta.style.left="-9999px";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); showMsg("✅ Copied: "+text); }catch(e){ showMsg(text); }
+  document.body.removeChild(ta);
+}
+function showMsg(m){
+  const el=document.getElementById("msg");
+  el.innerText=m; el.style.display="block";
+  setTimeout(()=> el.style.display="none", 3000);
+}
+function downloadHD(){
+  const el=document.getElementById("ticketCapture");
+  showMsg("Generating bright HD image...");
+  html2canvas(el, {scale:3, backgroundColor:"#ffffff", useCORS:true, logging:false}).then(canvas=>{
+    const link=document.createElement("a");
+    link.download="SKYLINK-${b.booking}-${b.tracking}-BRIGHT-HD.png";
+    link.href=canvas.toDataURL("image/png", 1.0);
+    link.click();
+    showMsg("✅ Saved to phone storage! Check Gallery/Downloads");
+    setTimeout(()=>{ if(confirm("Also save as PDF?")) window.print(); }, 800);
+  }).catch(e=>{
+    window.print();
+  });
+}
+<\/script>
 </body></html>
 `);
 });
 
-// NEW ISOLATED TRACKING - EXACTLY LIKE YOUR SAMPLE - NO HOME BUTTON - REAL LANDING
+// NEW REAL-TIME TRACKING - FIXED TO WORK EXACTLY AS REAL TIME - NO DELAY
 app.get('/track', async (req,res)=>{
   const code=req.query.code;let b=bookings.get(code);
   if(!b && BookingModel){try{const doc=await BookingModel.findOne({$or:[{tracking:code},{booking:code}]});if(doc)b=doc.toObject()}catch(e){}}
   if(!b){try{const obj=JSON.parse(fs.readFileSync(DATA_FILE,'utf8')||'{}');b=obj[code]}catch(e){}}
-  if(!b){return res.send('<html><body style="font-family:Arial;padding:20px">Invalid Tracking Code - Not Found: '+code+'</body></html>');}
-  const departTime = new Date(b.departISO).getTime();
-  const arriveTime = new Date(b.arriveISO).getTime();
-  const totalMs = arriveTime - departTime;
-  const now = Date.now();
-  const diffMs = now - departTime;
-  const isDeparted = diffMs > 0;
-  const isLanded = diffMs >= totalMs;
-  const totalHours = Math.floor(totalMs/3600000);
-  const totalMins = Math.floor((totalMs%3600000)/60000);
-  let timeInAirText = "Not Departed";
-  let statusText = "Scheduled";
-  let altitude = "N/A";
-  let speed = "N/A";
-  if(!isDeparted){
-    statusText = "Scheduled";
-    timeInAirText = "Not Departed";
-  } else if(isLanded){
-    statusText = "Arrived";
-    timeInAirText = `${totalHours}h ${totalMins}m (Landed)`;
-    altitude = "0 ft";
-    speed = "0 km/h";
-  } else {
-    const h = Math.floor(diffMs/3600000);
-    const m = Math.floor((diffMs%3600000)/60000);
-    timeInAirText = `${h}h ${m}m`;
-    statusText = diffMs < 15*60000? "Boarding" : diffMs < 30*60000? "Departed" : "In-Flight";
-    altitude = "35,000 ft";
-    speed = "850 km/h";
-  }
-  const departStr = new Date(b.departISO).toLocaleString('en-US',{month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true});
-  const arriveStr = new Date(b.arriveISO).toLocaleString('en-US',{month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true});
+  if(!b){return res.send('<html><body style="font-family:Arial;padding:20px">Invalid Tracking Code - Not Found: '+code+' <br><br><button onclick="copyRobust(\\''+code+'\\')" style="padding:8px 12px">Copy Code</button></body></html>');}
+
+  const departISO = b.departISO;
+  const arriveISO = b.arriveISO;
+  const durationMins = b.durationMins;
 
   res.send(`
 <html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Live Flight Tracking ${b.tracking}</title>
 <style>
 body{margin:0;background:#fff;font-family:Arial,Helvetica,sans-serif;padding:16px;color:#111}
-.container{max-width:700px}
+.container{max-width:700px;margin:auto}
 h2{margin:0 0 16px;font-size:18px;font-weight:700;display:flex;align-items:center;gap:6px}
 .line{margin:8px 0;font-size:14px}.label{font-weight:700}.value{font-weight:400}
 .divider{border:none;border-top:1.5px solid #1a2b5e;margin:16px 0}
 .live{margin-top:10px}
 .live b{font-size:15px}
 .green{color:#16a34a;font-weight:800}
-.red{color:#dc2626;font-weight:800}
+.btn{background:#0f2e6d;color:#fff;border:none;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;margin-left:6px}
+.status-box{padding:10px 14px;border-radius:8px;font-weight:900;font-size:14px;margin-top:4px;display:inline-block}
 </style>
 </head><body>
 <div class="container">
-  <h2>📍 Live Flight Tracking</h2>
-  <div class="line"><span class="label">Tracking Code:</span> <span class="value">${b.tracking}</span></div>
+  <h2>📍 Live Flight Tracking <button class="btn" onclick="copyRobust('${b.tracking}')">Copy ${b.tracking}</button></h2>
+  <div class="line"><span class="label">Tracking Code:</span> <span class="value">${b.tracking}</span> <button class="btn" onclick="copyRobust('${b.tracking}')">Copy</button></div>
   <div class="line"><span class="label">Passenger:</span> <span class="value">${b.name}</span></div>
   <div class="line"><span class="label">Flight:</span> <span class="value">${b.flight}</span></div>
-  <div class="line"><span class="label">Route:</span> <span class="value">${b.from} - ${b.fromFull.split(' - ')[1]||b.from} → ${b.to} - ${b.toFull.split(' - ')[1]||b.to}</span></div>
-  <div class="line"><span class="label">Departure:</span> <span class="value">${departStr}</span></div>
-  <div class="line"><span class="label">Est. Duration:</span> <span class="value">${totalHours}h ${totalMins}m</span></div>
-  <div class="line"><span class="label">Est. Arrival:</span> <span class="value">${arriveStr}</span></div>
+  <div class="line"><span class="label">Route:</span> <span class="value">${b.from} → ${b.to}</span></div>
+  <div class="line"><span class="label">Departure:</span> <span class="value" id="depStr"></span></div>
+  <div class="line"><span class="label">Est. Duration:</span> <span class="value">${Math.floor(durationMins/60)}h ${durationMins%60}m</span></div>
+  <div class="line"><span class="label">Est. Arrival:</span> <span class="value" id="arrStr"></span></div>
   <hr class="divider">
   <div class="live">
-    <div style="font-weight:700;margin-bottom:8px">Live Status</div>
-    <div class="line"><span class="label">Status:</span> <span class="value ${isLanded?'green':''}" style="font-weight:700;color:${statusText==='In-Flight'?'#16a34a': statusText==='Scheduled'?'#1e40af': statusText==='Arrived'?'#16a34a':'#b45309'}">${statusText}</span></div>
-    <div class="line"><span class="label">Time in Air:</span> <span class="value ${isDeparted &&!isLanded?'green':''} ${isLanded?'green':''}" style="font-weight:${isDeparted?'800':'400'}">${timeInAirText}</span></div>
-    <div class="line"><span class="label">Altitude:</span> <span class="value">${altitude}</span></div>
-    <div class="line"><span class="label">Speed:</span> <span class="value">${speed}</span></div>
+    <div style="font-weight:700;margin-bottom:8px">Live Status - Real Time (Updates Every Second)</div>
+    <div class="line"><span class="label">Status:</span> <span id="status" class="status-box">Loading...</span></div>
+    <div class="line"><span class="label">Time in Air:</span> <span id="timeInAir" class="value" style="font-weight:900;font-size:16px">Calculating...</span></div>
+    <div class="line"><span class="label">Altitude:</span> <span id="alt" class="value">N/A</span></div>
+    <div class="line"><span class="label">Speed:</span> <span id="spd" class="value">N/A</span></div>
+    <div class="line" style="margin-top:12px;font-size:12px;color:#64748b"><span id="countdown"></span></div>
   </div>
+  <div style="margin-top:20px"><button onclick="copyRobust(window.location.href)" style="background:#16a34a;color:#fff;border:none;padding:10px 14px;border-radius:8px;font-weight:800;cursor:pointer">Copy Tracking Link</button> <span id="copyMsg" style="font-size:11px;color:#16a34a;font-weight:800;margin-left:8px;display:none">Copied!</span></div>
 </div>
 <script>
-// Auto refresh every 60 seconds to update Time in Air real-time without showing Home
-setTimeout(()=>{ location.reload(); }, 60000);
-</script>
+const departISO = "${departISO}";
+const arriveISO = "${arriveISO}";
+const departMs = new Date(departISO).getTime();
+const arriveMs = new Date(arriveISO).getTime();
+const totalMs = arriveMs - departMs;
+
+document.getElementById("depStr").innerText = new Date(departISO).toLocaleString('en-US',{month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true});
+document.getElementById("arrStr").innerText = new Date(arriveISO).toLocaleString('en-US',{month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true});
+
+function copyRobust(text){
+  try{
+    if(navigator.clipboard && window.isSecureContext){
+      navigator.clipboard.writeText(text).then(()=>{showCopy()}).catch(()=>{fallbackCopy(text)});
+    }else{ fallbackCopy(text); }
+  }catch(e){ fallbackCopy(text); }
+}
+function fallbackCopy(text){
+  const ta=document.createElement("textarea");
+  ta.value=text; ta.style.position="fixed"; ta.style.left="-9999px";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); showCopy(); }catch(e){ alert(text); }
+  document.body.removeChild(ta);
+}
+function showCopy(){
+  const el=document.getElementById("copyMsg");
+  if(el){ el.style.display="inline"; el.innerText="✅ Copied!"; setTimeout(()=> el.style.display="none", 2000); }
+}
+
+function updateLive(){
+  const now = Date.now();
+  const diff = now - departMs;
+  const remain = arriveMs - now;
+  const statusEl = document.getElementById("status");
+  const timeEl = document.getElementById("timeInAir");
+  const altEl = document.getElementById("alt");
+  const spdEl = document.getElementById("spd");
+  const cdEl = document.getElementById("countdown");
+
+  if(diff < 0){
+    const minsToDep = Math.floor(Math.abs(diff)/60000);
+    const hrs = Math.floor(minsToDep/60);
+    const mins = minsToDep%60;
+    statusEl.innerText = "Scheduled";
+    statusEl.style.background="#dbeafe"; statusEl.style.color="#1e40af";
+    timeEl.innerText = "Not Departed";
+    timeEl.style.color="#1e40af";
+    altEl.innerText = "N/A";
+    spdEl.innerText = "N/A";
+    cdEl.innerText = "Departs in " + hrs + "h " + mins + "m";
+  } else if(diff >= totalMs){
+    statusEl.innerText = "Arrived ✅";
+    statusEl.style.background="#dcfce7"; statusEl.style.color="#166534";
+    const th = Math.floor(totalMs/3600000);
+    const tm = Math.floor((totalMs%3600000)/60000);
+    timeEl.innerText = th + "h " + tm + "m (Landed)";
+    timeEl.style.color="#16a34a";
+    altEl.innerText = "0 ft";
+    spdEl.innerText = "0 km/h";
+    cdEl.innerText = "Flight completed. Total flight time: " + th + "h " + tm + "m";
+  } else {
+    const h = Math.floor(diff/3600000);
+    const m = Math.floor((diff%3600000)/60000);
+    const s = Math.floor((diff%60000)/1000);
+    let stat = "In-Flight";
+    if(diff < 15*60000) stat = "Boarding";
+    else if(diff < 30*60000) stat = "Departed - Climbing";
+
+    statusEl.innerText = stat + " ✈️";
+    statusEl.style.background="#dcfce7"; statusEl.style.color="#166534";
+    timeEl.innerText = h + "h " + m + "m " + s + "s";
+    timeEl.style.color="#16a34a";
+    altEl.innerText = "35,000 ft";
+    spdEl.innerText = "850 km/h";
+    const rh = Math.floor(remain/3600000);
+    const rm = Math.floor((remain%3600000)/60000);
+    cdEl.innerText = "Live - " + rh + "h " + rm + "m remaining to arrival";
+  }
+}
+updateLive();
+setInterval(updateLive, 1000);
+<\/script>
 </body></html>
 `);
 });
 
 app.get('/health',(req,res)=> res.send('OK'));
-app.listen(PORT, ()=> console.log('SKYLINK FINAL V3 PROFESSIONAL READY'));
+app.listen(PORT, ()=> console.log('SKYLINK FINAL V4 REAL-TIME + DOWNLOAD BRIGHT + COPY FIX READY'));
