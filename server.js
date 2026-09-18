@@ -1,4 +1,4 @@
-// server.js - SKYLINK FINAL - ISOLATED TRACKING ONLY - NO LINK BACK TO MAIN SITE
+// server.js - SKYLINK REAL - FINAL FIXES BY GOSPEL - Pay button + Green hours + No link text removed
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
@@ -183,7 +183,7 @@ input:focus{background:#fff;border-color:#0f2e6d}
 <div id="step2">
 <div class="summary" id="summary"></div>
 <div class="warning">WARNING!!! Transfer this exact amount: <b>NGN 2,150</b> - Do not pay more or less to avoid booking failure.</div>
-<button class="btn-main" id="payBtn" onclick="payWithPaystack()">Pay NGN 2,150 with Paystack & Generate Boarding Pass</button>
+<button class="btn-main" id="payBtn" onclick="payWithPaystack()">Pay NGN 2,150 & Generate Boarding Pass</button>
 <button class="btn-main" style="background:#fff;color:#0f2e6d;border:1.5px solid #0f2e6d;margin-top:8px" onclick="backToForm()">← Back</button>
 </div>
 </div>
@@ -222,7 +222,7 @@ function backToForm(){document.getElementById("step2").style.display="none";docu
 function payWithPaystack(){
   var btn=document.getElementById("payBtn");
   if(typeof PaystackPop === 'undefined'){ alert("Paystack not loaded"); btn.disabled=false; return; }
-  btn.innerText="Opening Paystack - Real Payment..."; btn.disabled=true;
+  btn.innerText="Processing Payment..."; btn.disabled=true;
   try{
     var handler = PaystackPop.setup({
       key: PAYSTACK_PUBLIC_KEY,
@@ -230,7 +230,7 @@ function payWithPaystack(){
       amount: 2150 * 100,
       currency: "NGN",
       ref: "SKY-" + Math.floor(Math.random()*1000000000),
-      onClose: function(){ btn.innerText="Pay NGN 2,150 with Paystack & Generate Boarding Pass"; btn.disabled=false; },
+      onClose: function(){ btn.innerText="Pay NGN 2,150 & Generate Boarding Pass"; btn.disabled=false; },
       callback: function(response){
         btn.innerText="Payment successful! Generating ticket...";
         pendingPayload.paystackRef = response.reference;
@@ -353,7 +353,7 @@ app.get('/boarding-pass', async (req,res)=>{
   `);
 });
 
-// === ISOLATED TRACKING ONLY - NO LINK TO MAIN SITE - FINAL ===
+// === ISOLATED TRACKING - FINAL - GREEN HOURS TEXT + NO "NO LINK" TEXT ===
 app.get('/track', async (req,res)=>{
   const code=req.query.code;let b=bookings.get(code);
   if(!b && BookingModel){try{const doc=await BookingModel.findOne({$or:[{tracking:code},{booking:code}]});if(doc)b=doc.toObject()}catch(e){}}
@@ -382,6 +382,8 @@ app.get('/track', async (req,res)=>{
 .item{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px}.item.l{font-size:10px;font-weight:800;color:#64748b}.item.v{font-size:16px;font-weight:900;margin-top:4px}
 .timeline{display:flex;justify-content:space-between;margin-top:20px;position:relative}.timeline::before{content:'';position:absolute;top:14px;left:10%;right:10%;height:3px;background:#e2e8f0}.dot{width:28px;height:28px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;z-index:1}.dot.active{background:#16a34a;color:#fff}
 .hours-box{background:#fef3c7;border:2px solid #f59e0b;border-radius:12px;padding:12px;text-align:center;margin-top:14px;font-weight:900}
+.hours-green{color:#16a34a;font-weight:900;font-size:15px}
+.hours-red{color:#dc2626;font-weight:900;font-size:15px}
   </style>
   </head><body>
   <div class="card">
@@ -393,7 +395,7 @@ app.get('/track', async (req,res)=>{
         <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:800;margin-bottom:6px"><span>Flight Progress</span><span>${progress}%</span></div>
         <div class="bar"><div class="fill"></div></div>
       </div>
-      ${isDeparted? `<div class="hours-box">⏱️ Flight has been moving for: <b>${hours} HRS ${mins} MINS</b><br><span style="font-size:11px;font-weight:700">Departed: ${new Date(b.departISO).toLocaleString()} • Current: ${new Date().toLocaleString()}</span></div>` : `<div class="hours-box" style="background:#e0f2fe;border-color:#0ea5e9">🕒 Scheduled to depart in: <b>${Math.abs(hours)} HRS ${Math.abs(mins)} MINS</b><br><span style="font-size:11px">Departure: ${new Date(b.departISO).toLocaleString()}</span></div>`}
+      ${isDeparted? `<div class="hours-box"><span class="hours-green">⏱️ Flight has been moving for: <b>${hours} HRS ${mins} MINS</b></span><br><span style="font-size:11px;font-weight:700;color:#92400E">Departed: ${new Date(b.departISO).toLocaleString()} • Current: ${new Date().toLocaleString()}</span></div>` : `<div class="hours-box" style="background:#e0f2fe;border-color:#0ea5e9"><span class="hours-green">🕒 Scheduled to depart in: <b>${Math.abs(hours)} HRS ${Math.abs(mins)} MINS</b></span><br><span style="font-size:11px;color:#0c4a6e">Departure: ${new Date(b.departISO).toLocaleString()}</span></div>`}
       <div class="grid">
         <div class="item"><div class="l">FLIGHT</div><div class="v">${b.flight}</div></div>
         <div class="item"><div class="l">BOOKING REF</div><div class="v">${b.booking}</div></div>
@@ -409,7 +411,7 @@ app.get('/track', async (req,res)=>{
         <div style="text-align:center"><div class="dot ${['IN-FLIGHT','ARRIVING'].includes(status)?'active':''}">✈</div><div style="font-size:9px;font-weight:800;margin-top:4px">IN-FLIGHT</div></div>
         <div style="text-align:center"><div class="dot">○</div><div style="font-size:9px;font-weight:800;margin-top:4px">ARRIVED</div></div>
       </div>
-      <div style="text-align:center;margin-top:20px;font-size:10px;color:#94a3b8;font-weight:700">Tracking Code: ${b.tracking} • Booking: ${b.booking} • SKYLINK AIRLINES • NO LINK TO MAIN SITE</div>
+      <div style="text-align:center;margin-top:20px;font-size:10px;color:#94a3b8;font-weight:700">Tracking Code: ${b.tracking} • Booking: ${b.booking} • SKYLINK AIRLINES</div>
     </div>
   </div>
   <script>
@@ -429,4 +431,4 @@ app.get('/track', async (req,res)=>{
 });
 
 app.get('/health',(req,res)=> res.send('OK'));
-app.listen(PORT, ()=> console.log('SKYLINK FINAL - ISOLATED TRACKING - NO MAIN SITE LINK - READY'));
+app.listen(PORT, ()=> console.log('SKYLINK FINAL - FIXES APPLIED - Pay button + Green hours + No link text removed'));
