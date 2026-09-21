@@ -1,4 +1,4 @@
-// server.js - SKYLINK V8 HUGE HORIZONTAL - COPY TRACKING LINK FIX - OFFICIAL - TIMEZONE REAL FIX
+// server.js - SKYLINK V9 REAL TIMEZONE + OLD BOOKING AUTO-FIX - OFFICIAL
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
@@ -18,6 +18,7 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, JSON.stringify({}), 'utf8');
 let bookings = new Map();
 let BookingModel = null;
+
 async function initDB(){
   const uri = process.env.MONGODB_URI;
   if(uri && mongoose){
@@ -28,16 +29,20 @@ async function initDB(){
         from: String, fromFull: String, to: String, toFull: String,
         flight: String, gate: String, terminal: String, seat: String,
         class: String, departISO: String, arriveISO: String, durationMins: Number, distanceKm: Number, aircraft: String,
-        fromTz: String, toTz: String, baggage: String, paystackRef: String, amount: Number, createdAt: String
-      }, { _id: false });
+        fromTz: String, toTz: String, baggage: String, paystackRef: String, amount: Number, createdAt: String, _fixedV8: Boolean
+      }, { _id: false, strict: false });
       BookingModel = mongoose.model('Booking', schema);
       const all = await BookingModel.find({});
       all.forEach(d=>{ bookings.set(d.tracking, d.toObject()); bookings.set(d.booking, d.toObject()); });
     }catch(e){}
   }
   try{ const raw = fs.readFileSync(DATA_FILE,'utf8'); const obj = JSON.parse(raw||'{}'); Object.keys(obj).forEach(k=> bookings.set(k, obj[k])); }catch(e){}
+  // === AUTO-FIX ALL OLD BOOKINGS ON STARTUP - REAL ===
+  try{
+    bookings.forEach(b => { if(b && b.departISO &&!b._fixedV8) migrateOldBookingToReal(b); });
+    console.log('Old bookings auto-fixed checked');
+  }catch(e){}
 }
-initDB();
 async function savePerm(k, rec){
   bookings.set(k, rec); bookings.set(rec.tracking, rec); bookings.set(rec.booking, rec);
   try{ const o={}; bookings.forEach((v,k)=>{ o[k]=v }); fs.writeFileSync(DATA_FILE, JSON.stringify(o,null,2),'utf8'); }catch(e){}
@@ -143,13 +148,10 @@ function isAuthenticated(req){ const cookie = req.headers.cookie || ''; return c
 
 // === REAL TIMEZONE FIX - ONLY THIS IS NEW - 100% REAL ===
 function wallTimeToUTC(wallStr, tz){
-  // wallStr = "2026-09-21T07:00" tz = "America/New_York"
-  // This converts wall time in that tz to real UTC
   if(DateTime){
     const dt = DateTime.fromISO(wallStr, { zone: tz });
     if(dt.isValid) return dt.toUTC().toJSDate();
   }
-  // fallback if luxon not installed (still better than V8 bug)
   return new Date(wallStr);
 }
 function formatRealInTz(isoStr, tz){
@@ -159,6 +161,33 @@ function formatRealInTz(isoStr, tz){
     return new Date(isoStr).toLocaleString('en-US',{month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true}) + ' - ' + tz;
   }
 }
+function isOldBugBooking(b){
+  if(!b ||!b.departISO ||!b.fromTz) return false;
+  if(b._fixedV8) return false;
+  return true;
+}
+function migrateOldBookingToReal(b){
+  if(!isOldBugBooking(b)) return b;
+  try{
+    const wrongDate = new Date(b.departISO);
+    const yyyy = wrongDate.getUTCFullYear();
+    const mm = String(wrongDate.getUTCMonth()+1).padStart(2,'0');
+    const dd = String(wrongDate.getUTCDate()).padStart(2,'0');
+    const hh = String(wrongDate.getUTCHours()).padStart(2,'0');
+    const mi = String(wrongDate.getUTCMinutes()).padStart(2,'0');
+    const wallStr = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+    const realDepart = wallTimeToUTC(wallStr, b.fromTz);
+    const durationMs = (b.durationMins || 0) * 60000 || (new Date(b.arriveISO).getTime() - new Date(b.departISO).getTime());
+    const realArrive = new Date(realDepart.getTime() + durationMs);
+    b.departISO = realDepart.toISOString();
+    b.arriveISO = realArrive.toISOString();
+    b._fixedV8 = true;
+    savePerm(b.tracking, b);
+  }catch(e){ console.log('migrate fail', e); }
+  return b;
+}
+
+initDB();
 
 app.get('/skylink-admin-login', (req,res)=>{ res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#0f2e6d;display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial}.card{background:#fff;padding:30px;border-radius:16px;width:100%;max-width:360px;box-shadow:0 10px 40px rgba(0,0,0,.3)}input{width:100%;padding:13px;border-radius:10px;border:1.5px solid #e2e8f0;margin-top:12px;box-sizing:border-box;font-size:14px}button{width:100%;background:#0f2e6d;color:#fff;padding:13px;border-radius:10px;border:none;font-weight:900;margin-top:14px;cursor:pointer}</style></head><body><div class="card"><div style="text-align:center;font-weight:900;font-size:20px">✈️ SKYLINK ADMIN</div><div style="text-align:center;font-size:11px;color:#64748b;margin-top:6px;letter-spacing:1px">ADMIN LOGIN ONLY</div><form method="POST" action="/api/admin-login"><input type="password" name="password" placeholder="Enter admin password" required><button type="submit">Login →</button></form></div></body></html>`);});
 app.post('/api/admin-login', (req,res)=>{ const pass = req.body.password || ''; if(pass === ADMIN_PASSWORD){ res.setHeader('Set-Cookie', 'admin_auth=Skylink1824; Path=/; Max-Age=86400; HttpOnly'); res.redirect('/skylink-admin-gospel-2024'); } else { res.send('<script>alert("Wrong password"); location.href="/skylink-admin-login"</script>'); } });
@@ -278,11 +307,10 @@ app.post('/api/book', async (req,res)=>{
   const terminal='T'+Math.floor(1+Math.random()*3);
   const seat=Math.floor(10+Math.random()*30)+['A','B','C','D','E','F'][Math.floor(Math.random()*6)];
   const fromA=findAirport(from),toA=findAirport(to);
-  // REAL FIX - USE FROM COUNTRY TIMEZONE
   const departDate=depart? wallTimeToUTC(depart, fromA.tz) : new Date(Date.now()+7200000);
   const details=getFlightDetails(fromA.code,toA.code);
   const arriveDate=new Date(departDate.getTime()+details.durationMins*60000);
-  const rec={booking,tracking,name:name.toUpperCase(),email:email||"",from:fromA.code,fromFull:fromA.code+' - '+fromA.city+', '+fromA.country+' ('+fromA.name+')',to:toA.code,toFull:toA.code+' - '+toA.city+', '+toA.country+' ('+toA.name+')',flight,gate,terminal,seat,class:cls||'ECONOMY',departISO:departDate.toISOString(),arriveISO:arriveDate.toISOString(),durationMins:details.durationMins,distanceKm:details.distanceKm,aircraft:details.aircraft,fromTz:fromA.tz,toTz:toA.tz,baggage:'23KG',paystackRef,amount:2150,createdAt:new Date().toISOString()};
+  const rec={booking,tracking,name:name.toUpperCase(),email:email||"",from:fromA.code,fromFull:fromA.code+' - '+fromA.city+', '+fromA.country+' ('+fromA.name+')',to:toA.code,toFull:toA.code+' - '+toA.city+', '+toA.country+' ('+toA.name+')',flight,gate,terminal,seat,class:cls||'ECONOMY',departISO:departDate.toISOString(),arriveISO:arriveDate.toISOString(),durationMins:details.durationMins,distanceKm:details.distanceKm,aircraft:details.aircraft,fromTz:fromA.tz,toTz:toA.tz,baggage:'23KG',paystackRef,amount:2150,createdAt:new Date().toISOString(), _fixedV8: true};
   await savePerm(tracking, rec);
   res.json({boardingUrl:'/boarding-pass?code='+tracking});
 });
@@ -296,18 +324,17 @@ app.get('/skylink-admin-gospel-2024', async (req,res)=>{
   res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>SKYLINK Admin</title><style>body{margin:0;font-family:Inter,Arial;background:#f1f5f9}.header{background:#0f2e6d;color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:center}.card{max-width:1200px;margin:20px auto;background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.06);overflow:hidden;border:1px solid #e2e8f0}.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:20px}.stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px}.stat h3{margin:0;font-size:11px;color:#64748b}.stat p{margin:6px 0 0;font-size:22px;font-weight:900}.table-wrap{overflow:auto} table{width:100%;border-collapse:collapse;min-width:900px} th{background:#f8fafc;text-align:left;padding:12px 14px;font-size:11px;color:#64748b;border-bottom:2px solid #e2e8f0} a.logout{background:#ef4444;color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:800;font-size:12px}</style></head><body><div class="header"><div><div style="font-weight:900;font-size:20px">✈️ SKYLINK AIRLINES - ADMIN</div><div style="font-size:11px;opacity:0.8">Real Money Dashboard - Private</div></div><div><a class="logout" href="/skylink-admin-logout">Logout</a></div></div><div class="card"><div class="stats"><div class="stat"><h3>TOTAL BOOKINGS</h3><p>${all.length}</p></div><div class="stat"><h3>TOTAL REVENUE</h3><p style="color:#16a34a">NGN ${total.toLocaleString()}</p></div><div class="stat"><h3>TODAY</h3><p>${today}</p></div></div><div style="padding:0 20px 10px;font-weight:900">All Bookings - Paystack Verified</div><div class="table-wrap"><table><tr><th>BOOKING</th><th>TRACKING</th><th>PASSENGER</th><th>ROUTE</th><th>AMOUNT</th><th>PAYSTACK REF</th><th>DATE</th><th>ACTION</th></tr>${rows || '<tr><td colspan=8 style="padding:40px;text-align:center;color:#94a3b8">No bookings yet</td></tr>'}</table></div></div></body></html>`);
 });
 
-// V8 - HUGE FULLSCREEN HORIZONTAL - COPY TRACKING CODE WITH HTTPS + REMOVE LINK UNDER QR
 app.get('/boarding-pass', async (req,res)=>{
   const code=req.query.code;let b=bookings.get(code);
   if(!b && BookingModel){try{const doc=await BookingModel.findOne({$or:[{tracking:code},{booking:code}]});if(doc)b=doc.toObject()}catch(e){}}
   if(!b){try{const obj=JSON.parse(fs.readFileSync(DATA_FILE,'utf8')||'{}');b=obj[code]}catch(e){}}
   if(!b){return res.send('<h2 style="font-family:Arial;text-align:center;margin-top:50px">Boarding Pass Not Found</h2>');}
+  b = migrateOldBookingToReal(b);
   let qr=''; if(QRCode){ try{ qr=await QRCode.toDataURL('https://'+req.get('host')+'/track?code='+b.tracking); }catch(e){} }
   const host = req.get('host');
   const trackLink = 'https://'+host+'/track?code='+b.tracking;
   const durH = b.durationMins? Math.floor(b.durationMins/60) : 8;
   const durM = b.durationMins? b.durationMins%60 : 0;
-  // REAL FIX - FORMAT IN REAL FROM/TO TIMEZONE
   const departStr = formatRealInTz(b.departISO, b.fromTz);
   const arriveStr = formatRealInTz(b.arriveISO, b.toTz);
   const realDetailsBP = getFlightDetails(b.from, b.to);
@@ -322,12 +349,12 @@ app.get('/track', async (req,res)=>{
   if(!b && BookingModel){try{const doc=await BookingModel.findOne({$or:[{tracking:code},{booking:code}]});if(doc)b=doc.toObject()}catch(e){}}
   if(!b){try{const obj=JSON.parse(fs.readFileSync(DATA_FILE,'utf8')||'{}');b=obj[code]}catch(e){}}
   if(!b){return res.send('<html><body style="font-family:Arial;padding:20px">Invalid Tracking Code - Not Found: '+code+'</body></html>');}
+  b = migrateOldBookingToReal(b);
   const departISO = b.departISO;
   const arriveISO = b.arriveISO;
   const totalMs = new Date(arriveISO).getTime() - new Date(departISO).getTime();
   const totalH = Math.floor(totalMs/3600000);
   const totalM = Math.floor((totalMs%3600000)/60000);
-  // REAL FIX - FORMAT WITH REAL TZ
   let departStr = ''; let arriveStr = '';
   try{
     departStr = new Date(departISO).toLocaleString('en-US',{ timeZone: b.fromTz, month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true }) + ' ('+b.fromTz+')';
@@ -420,4 +447,4 @@ updateLive();setInterval(updateLive,1000);
 <\/script></body></html>`);
 });
 app.get('/health',(req,res)=> res.send('OK'));
-app.listen(PORT, ()=> console.log('SKYLINK V8 REAL TZ FIX - READY'));
+app.listen(PORT, ()=> console.log('SKYLINK V9 REAL TZ + OLD BOOKING AUTO-FIX READY'));
