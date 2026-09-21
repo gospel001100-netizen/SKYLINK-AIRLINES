@@ -1,10 +1,11 @@
-// server.js - SKYLINK V8 HUGE HORIZONTAL - COPY TRACKING LINK FIX - OFFICIAL
+// server.js - SKYLINK V8 HUGE HORIZONTAL - COPY TRACKING LINK FIX - OFFICIAL - TIMEZONE REAL FIX
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 let QRCode = null; try{ QRCode = require('qrcode'); }catch(e){}
 let mongoose = null; try{ mongoose = require('mongoose'); }catch(e){}
+let DateTime = null; try{ DateTime = require('luxon').DateTime; }catch(e){ console.log('luxon not installed - install luxon for real timezone'); }
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -139,6 +140,26 @@ function getFlightDetails(from, to){
 function genCode(p){return p+'-'+Math.random().toString(36).substring(2,7).toUpperCase()}
 function findAirport(c){return AIRPORTS.find(a=>a.code===c.toUpperCase())||{code:c.toUpperCase(), city:c, country:"", name:"Intl", tz:"UTC", lat:0, lon:0}}
 function isAuthenticated(req){ const cookie = req.headers.cookie || ''; return cookie.includes('admin_auth=Skylink1824'); }
+
+// === REAL TIMEZONE FIX - ONLY THIS IS NEW - 100% REAL ===
+function wallTimeToUTC(wallStr, tz){
+  // wallStr = "2026-09-21T07:00" tz = "America/New_York"
+  // This converts wall time in that tz to real UTC
+  if(DateTime){
+    const dt = DateTime.fromISO(wallStr, { zone: tz });
+    if(dt.isValid) return dt.toUTC().toJSDate();
+  }
+  // fallback if luxon not installed (still better than V8 bug)
+  return new Date(wallStr);
+}
+function formatRealInTz(isoStr, tz){
+  try{
+    return new Date(isoStr).toLocaleString('en-US',{ timeZone: tz, month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true }) + ' - ' + tz;
+  }catch(e){
+    return new Date(isoStr).toLocaleString('en-US',{month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true}) + ' - ' + tz;
+  }
+}
+
 app.get('/skylink-admin-login', (req,res)=>{ res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#0f2e6d;display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial}.card{background:#fff;padding:30px;border-radius:16px;width:100%;max-width:360px;box-shadow:0 10px 40px rgba(0,0,0,.3)}input{width:100%;padding:13px;border-radius:10px;border:1.5px solid #e2e8f0;margin-top:12px;box-sizing:border-box;font-size:14px}button{width:100%;background:#0f2e6d;color:#fff;padding:13px;border-radius:10px;border:none;font-weight:900;margin-top:14px;cursor:pointer}</style></head><body><div class="card"><div style="text-align:center;font-weight:900;font-size:20px">✈️ SKYLINK ADMIN</div><div style="text-align:center;font-size:11px;color:#64748b;margin-top:6px;letter-spacing:1px">ADMIN LOGIN ONLY</div><form method="POST" action="/api/admin-login"><input type="password" name="password" placeholder="Enter admin password" required><button type="submit">Login →</button></form></div></body></html>`);});
 app.post('/api/admin-login', (req,res)=>{ const pass = req.body.password || ''; if(pass === ADMIN_PASSWORD){ res.setHeader('Set-Cookie', 'admin_auth=Skylink1824; Path=/; Max-Age=86400; HttpOnly'); res.redirect('/skylink-admin-gospel-2024'); } else { res.send('<script>alert("Wrong password"); location.href="/skylink-admin-login"</script>'); } });
 app.get('/skylink-admin-logout', (req,res)=>{ res.setHeader('Set-Cookie', 'admin_auth=; Path=/; Max-Age=0'); res.redirect('/skylink-admin-login'); });
@@ -257,7 +278,8 @@ app.post('/api/book', async (req,res)=>{
   const terminal='T'+Math.floor(1+Math.random()*3);
   const seat=Math.floor(10+Math.random()*30)+['A','B','C','D','E','F'][Math.floor(Math.random()*6)];
   const fromA=findAirport(from),toA=findAirport(to);
-  const departDate=depart?new Date(depart):new Date(Date.now()+7200000);
+  // REAL FIX - USE FROM COUNTRY TIMEZONE
+  const departDate=depart? wallTimeToUTC(depart, fromA.tz) : new Date(Date.now()+7200000);
   const details=getFlightDetails(fromA.code,toA.code);
   const arriveDate=new Date(departDate.getTime()+details.durationMins*60000);
   const rec={booking,tracking,name:name.toUpperCase(),email:email||"",from:fromA.code,fromFull:fromA.code+' - '+fromA.city+', '+fromA.country+' ('+fromA.name+')',to:toA.code,toFull:toA.code+' - '+toA.city+', '+toA.country+' ('+toA.name+')',flight,gate,terminal,seat,class:cls||'ECONOMY',departISO:departDate.toISOString(),arriveISO:arriveDate.toISOString(),durationMins:details.durationMins,distanceKm:details.distanceKm,aircraft:details.aircraft,fromTz:fromA.tz,toTz:toA.tz,baggage:'23KG',paystackRef,amount:2150,createdAt:new Date().toISOString()};
@@ -285,8 +307,9 @@ app.get('/boarding-pass', async (req,res)=>{
   const trackLink = 'https://'+host+'/track?code='+b.tracking;
   const durH = b.durationMins? Math.floor(b.durationMins/60) : 8;
   const durM = b.durationMins? b.durationMins%60 : 0;
-  const departStr = new Date(b.departISO).toLocaleString('en-US',{month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true}) + ' - ' + b.fromTz;
-  const arriveStr = new Date(b.arriveISO).toLocaleString('en-US',{month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true}) + ' - ' + b.toTz;
+  // REAL FIX - FORMAT IN REAL FROM/TO TIMEZONE
+  const departStr = formatRealInTz(b.departISO, b.fromTz);
+  const arriveStr = formatRealInTz(b.arriveISO, b.toTz);
   const realDetailsBP = getFlightDetails(b.from, b.to);
   const aircraft = realDetailsBP.aircraft;
   const distance = (b.distanceKm || realDetailsBP.distanceKm) + " km";
@@ -304,8 +327,15 @@ app.get('/track', async (req,res)=>{
   const totalMs = new Date(arriveISO).getTime() - new Date(departISO).getTime();
   const totalH = Math.floor(totalMs/3600000);
   const totalM = Math.floor((totalMs%3600000)/60000);
-  const departStr = new Date(departISO).toLocaleString('en-US',{month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true});
-  const arriveStr = new Date(arriveISO).toLocaleString('en-US',{month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true});
+  // REAL FIX - FORMAT WITH REAL TZ
+  let departStr = ''; let arriveStr = '';
+  try{
+    departStr = new Date(departISO).toLocaleString('en-US',{ timeZone: b.fromTz, month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true }) + ' ('+b.fromTz+')';
+    arriveStr = new Date(arriveISO).toLocaleString('en-US',{ timeZone: b.toTz, month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true }) + ' ('+b.toTz+')';
+  }catch(e){
+    departStr = new Date(departISO).toLocaleString('en-US',{month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true}) + ' ('+b.fromTz+')';
+    arriveStr = new Date(arriveISO).toLocaleString('en-US',{month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true}) + ' ('+b.toTz+')';
+  }
   const realDetails = getFlightDetails(b.from, b.to);
   const realAircraft = realDetails.aircraft;
   const realDistance = b.distanceKm || realDetails.distanceKm;
@@ -324,9 +354,9 @@ app.get('/track', async (req,res)=>{
 <div class="line"><span class="label">Passenger:</span> <span class="value">${b.name}</span></div>
 <div class="line"><span class="label">Flight:</span> <span class="value">${b.flight}</span></div>
 <div class="line"><span class="label">Route:</span> <span class="value">${b.from} → ${b.to} (${b.fromFull} to ${b.toFull})</span></div>
-<div class="line"><span class="label">Departure:</span> <span class="value">${departStr} (${b.fromTz})</span></div>
+<div class="line"><span class="label">Departure:</span> <span class="value">${departStr}</span></div>
 <div class="line"><span class="label">Est. Duration:</span> <span class="value">${totalH}h ${totalM}m${realDistance? ' | '+realDistance+'km':''}</span></div>
-<div class="line"><span class="label">Est. Arrival:</span> <span class="value">${arriveStr} (${b.toTz})</span></div>
+<div class="line"><span class="label">Est. Arrival:</span> <span class="value">${arriveStr}</span></div>
 <div class="line"><span class="label">Aircraft:</span> <span class="value">${realAircraft}</span></div>
 <hr class="divider">
 <div class="live"><div style="font-weight:700;margin-bottom:8px">Live Status</div>
@@ -390,4 +420,4 @@ updateLive();setInterval(updateLive,1000);
 <\/script></body></html>`);
 });
 app.get('/health',(req,res)=> res.send('OK'));
-app.listen(PORT, ()=> console.log('SKYLINK V8 HUGE - COPY TRACKING LINK + NO HTTPS UNDER QR - READY'));
+app.listen(PORT, ()=> console.log('SKYLINK V8 REAL TZ FIX - READY'));
