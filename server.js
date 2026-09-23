@@ -585,10 +585,10 @@ app.get('/boarding-pass', async (req,res)=>{
 </div>
 
 <div class="sig-area">
-<div class="sig-box"><div class="sig-label">Sender Signature / Signed By:</div>${senderSig}<div style="margin-top:10px;border-top:1px solid #000;width:100%"></div><div style="font-size:9px;color:#64748b;margin-top:4px">Date: ${new Date(b.createdAt).toLocaleDateString()} - ${b.tracking}</div></div>
+<div class="sig-box"><div class="sig-label">Sender Signature / Signed By:</div><div style="font-family:'Brush Script MT','Segoe Script',cursive; font-size:26px; color:#1e40af; font-style:italic; transform:rotate(-3deg); line-height:1.1; margin-top:6px; text-shadow:0.5px 0.5px 0px #3b82f6;">${b.name}</div><div style="font-size:9px;color:#64748b;margin-top:2px;">✒️ S.G.C - ${b.tracking}</div></div>
 <div class="sig-box"><div class="sig-label">Receiver Signature / Received By:</div><div style="height:50px"></div><div style="margin-top:10px;border-top:1px solid #000;width:100%"></div><div style="font-size:9px;color:#64748b;margin-top:4px">Date: __________ Signature: __________</div></div>
 </div>
-</div>
+
 <div class="footer">SKYLINK LOGISTICS • +65 6700 8899 • support@skylinklogistics.com • www.skylinklogistics.com • Shipment subject to Skylink Terms & Conditions</div>
 </div>
 <div class="btn-area"><button class="btn-dl" onclick="downloadHD()">Download Bright HD Receipt</button><button class="btn-tr" onclick="location.href='/track?code=${b.tracking}'">Live Track Shipment</button><button class="btn-cp" onclick="copyRobust('${trackLink}')">Copy Tracking Link</button></div><div id="msg" style="font-size:12px;font-weight:800;color:#16a34a;text-align:center;margin:8px;display:none"></div>
@@ -659,7 +659,6 @@ app.get('/track', async (req,res)=>{
 <div class="label" style="margin-top:16px">Shipment Route Map</div>
 <div id="map"></div>
 
-<div style="margin-top:14px;text-align:center"><a href="/boarding-pass?code=${b.tracking}" style="background:#0f2e6d;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:800;font-size:12px">View Receipt</a></div>
 </div>
 
 <script>
