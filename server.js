@@ -585,13 +585,15 @@ app.get('/boarding-pass', async (req,res)=>{
 </div>
 
 <div class="sig-area">
-<div class="sig-box"><div class="sig-label">Sender Signature / Signed By:</div><div style="font-family:'Dancing Script','Great Vibes','Brush Script MT','Segoe Script',cursive; font-size:32px; color:#0a1f8f; font-weight:400; font-style:italic; transform:rotate(-4deg) skewX(-5deg); line-height:1; margin-top:8px; letter-spacing:0.5px; text-shadow:0 0 0.5px #0a1f8f; filter:contrast(1.2);"> <span style="display:inline-block; border-bottom:1.5px solid #0a1f8f; padding-bottom:2px; padding-right:15px;">${b.name}</span></div><div style="font-size:8px;color:#64748b;margin-top:4px; font-family:Arial;">✒️ S.G.C - ${b.tracking}</div></div>
-<div class="sig-box"><div class="sig-label">Receiver Signature / Received By:</div><div style="height:50px"></div><div style="margin-top:10px;border-top:1px solid #000;width:100%"></div><div style="font-size:9px;color:#64748b;margin-top:4px">Date: __________ Signature: __________</div></div>
+<div class="sig-box"><div class="sig-label">Sender Signature / Signed By:</div><img src="signature.png" style="width:190px;height:auto;margin-top:8px;transform:rotate(-3deg)" alt="signature"><div style="font-size:8px;color:#64748b;margin-top:2px">S.G.C - ${b.tracking}</div></div>
+<div class="sig-box"><div class="sig-label">Receiver Signature / Received By:</div><div style="height:50px"></div></div>
 </div>
 
-<div class="footer">SKYLINK LOGISTICS • +65 6700 8899 • support@skylinklogistics.com • www.skylinklogistics.com • Shipment subject to Skylink Terms & Conditions</div>
+<div class="footer">SKYLINK LOGISTICS • +65 6700 8899 • support@skylinklogistics.com • www.skylinklogistics.com</div>
 </div>
-<div class="btn-area"><button class="btn-dl" onclick="downloadHD()">Download Bright HD Receipt</button><button class="btn-tr" onclick="location.href='/track?code=${b.tracking}'">Live Track Shipment</button><button class="btn-cp" onclick="copyRobust('${trackLink}')">Copy Tracking Link</button></div><div id="msg" style="font-size:12px;font-weight:800;color:#16a34a;text-align:center;margin:8px;display:none"></div>
+</div> <!-- CLOSE receipt-outer / ticketCapture HERE! BEFORE BUTTONS! -->
+
+<div class="btn-area"><button class="btn-dl" onclick="downloadHD()">Download Bright HD Receipt</button>
 <script>
 function copyRobust(t){try{if(navigator.clipboard && window.isSecureContext){navigator.clipboard.writeText(t).then(()=>showMsg("Copied: "+t)).catch(()=>fallback(t))}else{fallback(t)}}catch(e){fallback(t)}}
 function fallback(t){const ta=document.createElement("textarea");ta.value=t;ta.style.position="fixed";ta.style.left="-9999px";document.body.appendChild(ta);ta.select();try{document.execCommand("copy");showMsg("Copied: "+t)}catch(e){showMsg(t)}document.body.removeChild(ta)}
