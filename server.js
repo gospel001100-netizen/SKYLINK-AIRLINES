@@ -735,6 +735,7 @@ app.get('/track', async (req,res)=>{
     departStr = new Date(departISO).toLocaleString('en-US',{month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true}) + ' ('+b.fromTz+')';
     arriveStr = new Date(arriveISO).toLocaleString('en-US',{month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true}) + ' ('+b.toTz+')';
   }
+  
   const realDetails = getFlightDetails(b.from, b.to);
   const realAircraft = realDetails.aircraft;
   const realDistance = b.distanceKm || realDetails.distanceKm;
