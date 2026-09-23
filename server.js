@@ -604,7 +604,7 @@ function downloadHD(){const el=document.getElementById("ticketCapture");showMsg(
   res.send('<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Boarding Pass ' + b.booking + '</title><script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script><style>*{box-sizing:border-box} html,body{margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif}.wrap{width:100%;min-height:100vh;background:#f1f5f9;display:flex;flex-direction:column;align-items:center;padding:10px}.ticket-outer{width:100%;max-width:1000px;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.12);border:1px solid #e2e8f0}.ticket{width:100%;background:#fff;filter:brightness(1.08)}.header{background:#0f2b5c;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}.header h1{margin:0;font-size:22px;font-weight:900;letter-spacing:.5px}.header h1 span{color:#facc15}.header-right{font-size:9px;opacity:.9;text-align:right;line-height:1.3}.header-sub{font-size:8px;letter-spacing:.6px;opacity:.85;margin-top:2px}.content{padding:14px 16px;display:grid;grid-template-columns:1fr 190px;gap:14px;background:#fff}.label{font-size:9px;color:#6b7280;font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-top:10px}.value{font-size:13px;font-weight:800;color:#111827;margin-top:1px;word-break:break-word;line-height:1.2}.big-name{font-size:15px;font-weight:900;text-transform:uppercase}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.status-green{color:#16a34a;font-weight:900;font-size:11px}.qr-box{border:1.5px solid #d1d5db;border-radius:12px;padding:10px;text-align:center;background:#fff;height:fit-content}.qr-box img{width:100%;max-width:170px;height:auto}.bottom-bar{background:#0f2b5c;color:#cbd5e1;padding:8px 16px;font-size:7.5px;text-align:center;letter-spacing:.4px}.stub{padding:8px 16px;background:#fff;border-top:2px dashed #9ca3af;font-size:9px;font-weight:800;line-height:1.3}.btn-area{width:100%;max-width:1000px;padding:12px;display:flex;gap:8px;justify-content:center;background:transparent;margin-top:8px;flex-wrap:wrap}.btn-dl{background:#16a34a;color:#fff;border:none;padding:11px 16px;border-radius:8px;font-weight:900;cursor:pointer;font-size:13px}.btn-tr{background:#0f2e6d;color:#fff;border:none;padding:11px 16px;border-radius:8px;font-weight:900;cursor:pointer;font-size:13px}.btn-cp{background:#fff;color:#0f2e6d;border:1.5px solid #0f2e6d;padding:11px 16px;border-radius:8px;font-weight:900;cursor:pointer;font-size:13px}</style></head><body><div class="wrap"><div class="ticket-outer" id="ticketCapture"><div class="ticket"><div class="header"><div><h1>SKYLINK<span> AIRLINES</span></h1><div class="header-sub">IATA CERTIFIED • EST. 2018 • OFFICIAL BOARDING PASS</div></div><div class="header-right">' + host + '<br>' + b.tracking + '<br>OFFICIAL</div></div><div class="content"><div><div class="label">PASSENGER NAME</div><div class="value big-name">' + b.name + '</div><div class="grid2"><div><div class="label">FROM / DE</div><div class="value">' + b.fromFull + '</div></div><div><div class="label">TO / A</div><div class="value">' + b.toFull + '</div></div></div><div class="grid3"><div><div class="label">FLIGHT / VOL</div><div class="value">' + b.flight + '</div></div><div><div class="label">DATE</div><div class="value">' + new Date(b.departISO).toLocaleDateString('en-GB') + '</div></div><div><div class="label">SEAT / SIEGE</div><div class="value" style="font-size:15px">' + b.seat + '</div></div></div><div class="grid3"><div><div class="label">GATE / PORTE</div><div class="value">' + b.gate + '</div></div><div><div class="label">TERMINAL</div><div class="value">' + b.terminal + '</div></div><div><div class="label">CLASS</div><div class="value">' + b.class + '</div></div></div><div class="grid3"><div><div class="label">BAGGAGE</div><div class="value">' + b.baggage + '</div></div><div><div class="label">TRACKING CODE</div><div class="value" style="font-size:11px">' + b.tracking + '</div></div><div><div class="label">STATUS</div><div class="value status-green">CONFIRMED / CONFIRME</div></div></div><div style="margin-top:10px"><div class="label">DEPARTURE / DEPART</div><div class="value">' + departStr + '</div><div class="label">ARRIVAL / ARRIVEE</div><div class="value">' + arriveStr + '</div></div><div style="margin-top:10px;font-size:10px;line-height:1.4"><b>AIRCRAFT:</b> ' + aircraft + ' (' + distance + ') | <b>DURATION:</b> ' + durH + 'h ' + durM.toString().padStart(2,'0') + 'm | <b>AMOUNT:</b> NGN '+(b.amount||2150)+'<br><b>IMPORTANT:</b> Present this boarding pass with valid ID at check-in counter 2 hours before departure.</div></div><div class="qr-box">' + qrHtml + '<div style="font-size:9px;font-weight:800;margin-top:8px;color:#0f2b5c">SCAN TO TRACK LIVE FLIGHT STATUS</div></div></div><div class="bottom-bar">This is an official e-ticket issued by SKYLINK AIRLINES. Non-transferable.</div><div class="stub">BOARDING PASS STUB<br>' + b.name + ' | ' + b.flight + ' | ' + b.from + ' ' + b.to + ' | SEAT ' + b.seat + ' | GATE ' + b.gate + ' | ' + b.tracking + '</div></div></div><div class="btn-area"><button class="btn-dl" onclick="downloadHD()">Download Bright HD</button><button class="btn-tr" onclick="location.href=\'/track?code=' + b.tracking + '\'">Live Track</button><button class="btn-cp" onclick="copyRobust(\'' + trackLink + '\')">Copy Tracking Link</button></div><div id="msg" style="font-size:12px;font-weight:800;color:#16a34a;text-align:center;margin:8px;display:none"></div></div><script>function copyRobust(t){try{if(navigator.clipboard && window.isSecureContext){navigator.clipboard.writeText(t).then(()=>showMsg("Copied Tracking Link: "+t)).catch(()=>fallback(t))}else{fallback(t)}}catch(e){fallback(t)}}function fallback(t){const ta=document.createElement("textarea");ta.value=t;ta.style.position="fixed";ta.style.left="-9999px";document.body.appendChild(ta);ta.select();try{document.execCommand("copy");showMsg("Copied Tracking Link: "+t)}catch(e){showMsg(t)}document.body.removeChild(ta)}function showMsg(m){const el=document.getElementById("msg");el.innerText=m;el.style.display="block";setTimeout(()=>el.style.display="none",4000)}function downloadHD(){const el=document.getElementById("ticketCapture");showMsg("Generating HD...");html2canvas(el,{scale:3,backgroundColor:"#ffffff",useCORS:true}).then(canvas=>{const link=document.createElement("a");link.download="SKYLINK-' + b.booking + '-' + b.tracking + '-HD.png";link.href=canvas.toDataURL("image/png",1.0);link.click();showMsg("Saved - Bright HD")}).catch(()=>{window.print()})}<\/script></body></html>');
 });
 
-// === TRACKING - FLIGHT LIGHT + LOGISTICS DARK CARGO + STEPS ===
+// === TRACKING - FLIGHT + LOGISTICS BOTH PLAIN WHITE, NO API KEY ===
 app.get('/track', async (req,res)=>{
   const code=req.query.code;let b=bookings.get(code);
   if(!b && BookingModel){try{const doc=await BookingModel.findOne({$or:[{tracking:code},{booking:code}]});if(doc)b=doc.toObject()}catch(e){}}
@@ -627,61 +627,114 @@ app.get('/track', async (req,res)=>{
   const fromA = findAirport(b.from); const toA = findAirport(b.to);
   const fromLat = fromA.lat || 15; const fromLon = fromA.lon || 45; const toLat = toA.lat || fromLat+5; const toLon = toA.lon || fromLon+5;
   const isLog = b.type==='logistics';
-  if(!isLog){
-    return res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Live Flight ${b.tracking}</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script><style>body{margin:0;background:#fff;font-family:Arial;padding:16px;color:#111}.container{max-width:700px}h2{margin:0 0 16px;font-size:18px;font-weight:700}.line{margin:8px 0;font-size:14px}.label{font-weight:700}.divider{border:none;border-top:1.5px solid #1a2b5e;margin:16px 0}.status-box{padding:6px 10px;border-radius:6px;font-weight:900;font-size:13px;display:inline-block}#map{width:100%;height:380px;border-radius:12px;border:1.5px solid #1a2b5e;margin-top:16px}</style></head><body><div class="container"><h2>📍 Live Flight Tracking</h2><div class="line"><b>Tracking:</b> ${b.tracking}</div><div class="line"><b>Passenger:</b> ${b.name}</div><div class="line"><b>Flight:</b> ${b.flight}</div><div class="line"><b>Route:</b> ${b.from} → ${b.to} (${b.fromFull} to ${b.toFull})</div><div class="line"><b>Departure:</b> ${departStr}</div><div class="line"><b>Duration:</b> ${totalH}h ${totalM}m | ${realDistance}km</div><div class="line"><b>Arrival:</b> ${arriveStr}</div><div class="line"><b>Aircraft:</b> ${realAircraft}</div><hr class="divider"><div><b>Live Status</b></div><div class="line"><b>Status:</b> <span id="status" class="status-box">Loading</span></div><div class="line"><b>Time in Air:</b> <span id="timeInAir" style="font-weight:900;color:#16a34a"></span></div><div class="line"><b>Altitude:</b> <span id="alt"></span> | <b>Speed:</b> <span id="spd"></span></div><div class="line" style="font-size:12px;color:#64748b"><span id="countdown"></span></div><div style="font-weight:900;margin-top:18px">🗺️ Live Map</div><div id="map"></div></div><script>
-const departISO="${departISO}",arriveISO="${arriveISO}",fromLat=${fromLat},fromLon=${fromLon},toLat=${toLat},toLon=${toLon};
-const departMs=new Date(departISO).getTime(),arriveMs=new Date(arriveISO).getTime(),totalMs=arriveMs-departMs;
-const map=L.map('map').setView([(fromLat+toLat)/2,(fromLon+toLon)/2],3);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(map);
-const line=L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:'#1a2b5e',weight:3,dashArray:'6,8'}).addTo(map);L.marker([fromLat,fromLon]).addTo(map);L.marker([toLat,toLon]).addTo(map);
-const icon=L.divIcon({html:'✈️',iconSize:[26,26]});const m=L.marker([fromLat,fromLon],{icon}).addTo(map);map.fitBounds(line.getBounds(),{padding:[30,30]});
-function tick(){const now=Date.now(),diff=now-departMs,remain=arriveMs-now;let p=Math.min(1,Math.max(0,diff/totalMs));const s=document.getElementById('status'),t=document.getElementById('timeInAir'),a=document.getElementById('alt'),sp=document.getElementById('spd'),c=document.getElementById('countdown');if(diff<0){s.innerText="Scheduled";s.style.background="#dbeafe";s.style.color="#1e40af";t.innerText="Not Departed";a.innerText="0 ft";sp.innerText="0 km/h";const ab=Math.abs(diff),h=Math.floor(ab/3600000),mm=Math.floor((ab%3600000)/60000),ss=Math.floor((ab%60000)/1000);c.innerText="Departs in "+h+"h "+mm+"m "+ss+"s";}else if(diff>=totalMs){s.innerText="Landed ✅";s.style.background="#dcfce7";s.style.color="#166534";t.innerText=Math.floor(totalMs/3600000)+"h "+Math.floor((totalMs%3600000)/60000)+"m (Completed)";a.innerText="0 ft";sp.innerText="0 km/h";c.innerText="Completed";p=1;}else{const h=Math.floor(diff/3600000),mm=Math.floor((diff%3600000)/60000),ss=Math.floor((diff%60000)/1000);s.innerText="Cruising ✈️";s.style.background="#dcfce7";s.style.color="#166534";t.innerText=h+"h "+mm+"m "+ss+"s";a.innerText="35,000 ft";sp.innerText="880 km/h";const rh=Math.floor(remain/3600000),rm=Math.floor((remain%3600000)/60000),rs=Math.floor((remain%60000)/1000);c.innerText=rh+"h "+rm+"m "+rs+"s remaining";}m.setLatLng([fromLat+(toLat-fromLat)*p,fromLon+(toLon-fromLon)*p]);}tick();setInterval(tick,1000);
+
+  const leafletHead = `<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script><style>#map{height:380px;width:100%;border-radius:12px;border:1px solid #e2e8f0;margin-top:12px;background:#f1f5f9}</style>`;
+
+  if(isLog){
+    return res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>SKYLINK LOGISTICS - Live Shipment ${b.tracking}</title>${leafletHead}
+<style>body{margin:0;font-family:Arial;background:#f1f5f9;padding:12px;display:flex;justify-content:center}.card{width:100%;max-width:540px;background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,.06);border:1px solid #e2e8f0}.label{font-size:11px;color:#64748b;font-weight:800;text-transform:uppercase;margin-top:10px}.value{font-size:13px;font-weight:800;color:#0f172a;margin-top:2px}.progress{width:100%;height:10px;background:#e2e8f0;border-radius:20px;overflow:hidden;margin-top:8px}.bar{height:100%;background:#16a34a;transition:width 0.5s}.steps{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.step{border:1.5px solid #e2e8f0;border-radius:10px;padding:10px;text-align:center;font-size:12px;font-weight:800}.step.active{border-color:#16a34a;background:#f0fdf4;color:#15803d}.step.done{background:#f8fafc;color:#64748b}</style></head><body>
+<div class="card">
+<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:900;font-size:14px">📦 SKYLINK LOGISTICS - Live Shipment</div><div style="background:#facc15;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:900">${b.tracking}</div></div>
+
+<div class="label">Sender:</div><div class="value">${b.name} (${b.phone||''})</div>
+<div class="label">Receiver:</div><div class="value">${b.receiver||''} - ${b.receiverEmail||''}</div>
+<div class="label">Address:</div><div class="value">${b.receiverAddress||''}</div>
+<div class="label">Package:</div><div class="value">${b.desc||'Gold'} - ${b.weight||'2.6 KG'}</div>
+<div class="label">Route:</div><div class="value">${b.from} → ${b.to}</div>
+<div class="label">Departure:</div><div class="value">${departStr}</div>
+<div class="label">Arrival:</div><div class="value">${arriveStr}</div>
+<div class="label">Carrier:</div><div class="value">${realAircraft} | Distance: ${realDistance}km</div>
+<div class="label">Status:</div><div id="statusText" style="font-weight:900;color:#16a34a;margin-top:4px">Calculating...</div>
+
+<div class="progress"><div id="pBar" class="bar" style="width:0%"></div></div>
+<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:4px;color:#64748b"><span id="pPercent">0%</span><span id="pTime"></span></div>
+
+<div class="steps">
+<div id="s1" class="step">📋 Order Received</div>
+<div id="s2" class="step">🚐 Pickup Van Collected</div>
+<div id="s3" class="step">✈️ In Transit Cargo Flight</div>
+<div id="s4" class="step">🏠 Delivered</div>
+</div>
+
+<div class="label" style="margin-top:16px">Shipment Route Map</div>
+<div id="map"></div>
+
+<div style="margin-top:14px;text-align:center"><a href="/boarding-pass?code=${b.tracking}" style="background:#0f2e6d;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:800;font-size:12px">View Receipt</a></div>
+</div>
+
+<script>
+const departISO="${b.departISO}"; const arriveISO="${b.arriveISO}"; const fromLat=${fromLat}; const fromLon=${fromLon}; const toLat=${toLat}; const toLon=${toLon};
+function initMap(){
+  const map = L.map('map').setView([fromLat, fromLon], 4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 18
+  }).addTo(map);
+  const latlngs = [[fromLat, fromLon],[toLat, toLon]];
+  L.polyline(latlngs, {color:'#16a34a', weight:3, dashArray:'6 8'}).addTo(map);
+  L.marker([fromLat, fromLon]).addTo(map).bindPopup("${b.from}");
+  L.marker([toLat, toLon]).addTo(map).bindPopup("${b.to}");
+  window._cargoMap = map;
+  window._cargoMarker = L.marker([fromLat, fromLon], {icon: L.divIcon({html:'📦', className:'', iconSize:[30,30]})}).addTo(map);
+}
+function update(){
+  const now = new Date(); const dep = new Date(departISO); const arr = new Date(arriveISO);
+  const total = arr - dep; const elapsed = now - dep; let p = Math.max(0, Math.min(1, elapsed/total));
+  const remainMs = arr - now; const diff = now - dep;
+  document.getElementById('pBar').style.width = (p*100).toFixed(0)+'%';
+  document.getElementById('pPercent').innerText = (p*100).toFixed(0)+'%';
+  if(remainMs>0){
+    const h=Math.floor(remainMs/3600000); const m=Math.floor((remainMs%3600000)/60000); const s=Math.floor((remainMs%60000)/1000);
+    document.getElementById('pTime').innerText = h+'h '+m+'m '+s+'s remaining to delivery';
+  } else {
+    document.getElementById('pTime').innerText = 'Delivered';
+  }
+  const s1=document.getElementById('s1'), s2=document.getElementById('s2'), s3=document.getElementById('s3'), s4=document.getElementById('s4');
+  [s1,s2,s3,s4].forEach(s=>{s.className='step';});
+  let statusT='';
+  if(diff<0){
+    const waitMs = dep - now; const wh=Math.floor(waitMs/3600000); const wm=Math.floor((waitMs%3600000)/60000);
+    s1.className='step active'; statusT='Ready for Pickup - Van arrives in '+wh+'h '+wm+'m';
+    if(window._cargoMarker) window._cargoMarker.setLatLng([fromLat, fromLon]);
+  } else if(p<0.15){
+    s1.className='step done'; s2.className='step active'; statusT='Pickup Van Collected - In Transit to Airport';
+  } else if(p<0.95){
+    s1.className='step done'; s2.className='step done'; s3.className='step active'; statusT='In Transit - Cargo Flight Airborne';
+    if(window._cargoMarker){
+      const lat = fromLat + (toLat-fromLat)*p;
+      const lon = fromLon + (toLon-fromLon)*p;
+      window._cargoMarker.setLatLng([lat, lon]);
+    }
+  } else {
+    s1.className='step done'; s2.className='step done'; s3.className='step done'; s4.className='step active'; statusT='Delivered';
+    if(window._cargoMarker) window._cargoMarker.setLatLng([toLat, toLon]);
+  }
+  document.getElementById('statusText').innerText = statusT;
+}
+initMap(); update(); setInterval(update,1000);
 <\/script></body></html>`);
   }
-  // LOGISTICS DARK CARGO
-  res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shipment ${b.tracking}</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script><style>
-body{margin:0;background:#0f172a;color:#e2e8f0;font-family:Inter,Arial;padding:0}.container{max-width:760px;margin:0 auto;padding:16px}.card{background:#1e293b;border-radius:16px;padding:16px;border:1px solid #334155;margin-top:12px}.topbar{background:#0f2e6d;padding:14px 18px;border-radius:12px;display:flex;justify-content:space-between;align-items:center}.topbar h2{margin:0;font-size:16px;font-weight:900;color:#fff}.badge{background:#facc15;color:#000;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:900}.line{margin:8px 0;font-size:13px;color:#cbd5e1}.label{color:#94a3b8;font-weight:700}.value{color:#fff;font-weight:600}.progress-wrap{background:#0f172a;border-radius:20px;height:14px;overflow:hidden;margin:14px 0;border:1px solid #334155}.progress-bar{height:100%;background:linear-gradient(90deg,#22c55e,#16a34a);width:0%;transition:width 1s linear}.steps{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:14px}.step{text-align:center;padding:10px 6px;border-radius:12px;background:#0f172a;border:1px solid #334155;opacity:0.5}.step.active{background:#16a34a;border-color:#22c55e;opacity:1;color:#fff}.step.done{background:#1e3a8a;border-color:#3b82f6;opacity:1;color:#fff}.step.icon{font-size:22px;display:block;margin-bottom:4px}.step.txt{font-size:10px;font-weight:800;line-height:1.2}#map{width:100%;height:360px;border-radius:12px;margin-top:14px}.status-box{padding:5px 10px;border-radius:8px;font-weight:900;font-size:12px;background:#1e3a8a;color:#93c5fd}
-</style></head><body><div class="container"><div class="topbar"><h2>📦 SKYLINK LOGISTICS - Live Shipment</h2><span class="badge">${b.tracking}</span></div><div class="card"><div class="line"><span class="label">Sender:</span> <span class="value">${b.name} ${b.phone?'('+b.phone+')':''}</span></div><div class="line"><span class="label">Receiver:</span> <span class="value">${b.receiver} - ${b.receiverEmail||''}</span></div><div class="line"><span class="label">Address:</span> <span class="value">${b.receiverAddress||''}</span></div><div class="line"><span class="label">Package:</span> <span class="value">${b.desc||''} - ${b.weight||''}</span></div><div class="line"><span class="label">Route:</span> <span class="value">${b.from} → ${b.to}</span></div><div class="line"><span class="label">Departure:</span> <span class="value">${departStr}</span></div><div class="line"><span class="label">Arrival:</span> <span class="value">${arriveStr}</span></div><div class="line"><span class="label">Carrier:</span> <span class="value">${realAircraft}</span> | <span class="label">Distance:</span> <span class="value">${realDistance}km</span></div><div style="margin-top:12px;display:flex;justify-content:space-between;font-size:12px"><span class="label">Status:</span> <span id="status" class="status-box">Loading</span></div><div class="progress-wrap"><div id="progressBar" class="progress-bar"></div></div><div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8"><span id="pct">0%</span><span id="timeInAir">Calculating...</span></div><div style="font-size:11px;color:#64748b;margin-top:6px"><span id="countdown"></span></div><div class="steps"><div id="s1" class="step"><span class="icon">📋</span><span class="txt">Order<br>Received</span></div><div id="s2" class="step"><span class="icon">🚐</span><span class="txt">Pickup Van<br>Collected</span></div><div id="s3" class="step"><span class="icon">✈️</span><span class="txt">In Transit<br>Cargo Flight</span></div><div id="s4" class="step"><span class="icon">🏠</span><span class="txt">Delivered</span></div></div></div><div class="card" style="padding:8px"><div style="font-weight:900;font-size:13px;margin-bottom:8px">🗺️ Dark Cargo Map - Live Shipment Progress</div><div id="map"></div></div></div><script>
-const departISO="${departISO}",arriveISO="${arriveISO}",fromLat=${fromLat},fromLon=${fromLon},toLat=${toLat},toLon=${toLon};
-const departMs=new Date(departISO).getTime(),arriveMs=new Date(arriveISO).getTime(),totalMs=arriveMs-departMs;
-const map=L.map('map',{zoomControl:true}).setView([(fromLat+toLat)/2,(fromLon+toLon)/2],3);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'© CARTO'}).addTo(map);
-const route=L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:'#22c55e',weight:4,dashArray:'8,10',opacity:0.9}).addTo(map);
-L.marker([fromLat,fromLon]).addTo(map).bindPopup('Origin: ${b.from}');
-L.marker([toLat,toLon]).addTo(map).bindPopup('Destination: ${b.to}');
-const boxIcon=L.divIcon({html:'<div style="font-size:28px;filter:drop-shadow(0 0 6px #22c55e)">📦</div>',iconSize:[28,28],className:''});
-const vanIcon=L.divIcon({html:'<div style="font-size:28px">🚐</div>',iconSize:[28,28],className:''});
-const mover=L.marker([fromLat,fromLon],{icon:boxIcon}).addTo(map);
-map.fitBounds(route.getBounds(),{padding:[30,30]});
-function updateSteps(p, diff){
-  const s1=document.getElementById('s1'),s2=document.getElementById('s2'),s3=document.getElementById('s3'),s4=document.getElementById('s4');
-  [s1,s2,s3,s4].forEach(s=>{s.className='step';});
-  if(diff<0){ s1.classList.add('active'); }
-  else if(p<0.15){ s1.classList.add('done'); s2.classList.add('active'); mover.setIcon(vanIcon); }
-  else if(p<0.95){ s1.classList.add('done'); s2.classList.add('done'); s3.classList.add('active'); mover.setIcon(boxIcon); }
-  else{ s1.classList.add('done'); s2.classList.add('done'); s3.classList.add('done'); s4.classList.add('active'); }
-}
-function tick(){
-  const now=Date.now(), diff=now-departMs, remain=arriveMs-now;
-  let p=Math.min(1,Math.max(0,diff/totalMs)); if(isNaN(p)) p=0;
-  const status=document.getElementById('status'), time=document.getElementById('timeInAir'), cd=document.getElementById('countdown'), bar=document.getElementById('progressBar'), pct=document.getElementById('pct');
-  bar.style.width=Math.round(p*100)+"%"; pct.innerText=Math.round(p*100)+"%";
-  updateSteps(p, diff);
-  if(diff<0){
-    status.innerText="Ready for Pickup 🚐"; time.innerText="Not Dispatched";
-    const ab=Math.abs(diff),h=Math.floor(ab/3600000),m=Math.floor((ab%3600000)/60000),s=Math.floor((ab%60000)/1000);
-    cd.innerText="Pickup van arrives in "+h+"h "+m+"m "+s+"s";
-  }else if(diff>=totalMs){
-    status.innerText="Delivered ✅"; time.innerText="Completed - "+Math.floor(totalMs/3600000)+"h "+Math.floor((totalMs%3600000)/60000)+"m"; cd.innerText="Delivered at "+new Date(arriveISO).toLocaleString(); p=1;
-  }else{
-    const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
-    status.innerText=p<0.15?"Pickup Van En Route 🚐":"In Transit ✈️"; time.innerText=h+"h "+m+"m "+s+"s in transit";
-    const rh=Math.floor(remain/3600000),rm=Math.floor((remain%3600000)/60000),rs=Math.floor((remain%60000)/1000);
-    cd.innerText=rh+"h "+rm+"m "+rs+"s remaining to delivery";
-  }
-  mover.setLatLng([fromLat+(toLat-fromLat)*p, fromLon+(toLon-fromLon)*p]);
-}
-tick(); setInterval(tick,1000);
+
+  // FLIGHT - PLAIN WHITE SAME STYLE
+  return res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Live Flight ${b.tracking}</title>${leafletHead}
+<style>body{margin:0;font-family:Arial;background:#f1f5f9;padding:12px;display:flex;justify-content:center}.card{width:100%;max-width:540px;background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,.06);border:1px solid #e2e8f0}.label{font-size:11px;color:#64748b;font-weight:800;text-transform:uppercase;margin-top:10px}.value{font-size:13px;font-weight:800;color:#0f172a;margin-top:2px}</style></head><body><div class="card">
+<div style="display:flex;justify-content:space-between"><div style="font-weight:900">✈️ SKYLINK AIRLINES - Live Flight</div><div style="background:#dbeafe;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:900">${b.tracking}</div></div>
+<div class="label">Passenger:</div><div class="value">${b.name}</div>
+<div class="label">Flight:</div><div class="value">${b.flight} - ${realAircraft}</div>
+<div class="label">Route:</div><div class="value">${b.from} → ${b.to}</div>
+<div class="label">Departure:</div><div class="value">${departStr}</div>
+<div class="label">Duration:</div><div class="value">${totalH}h ${totalM}m</div>
+<div class="label">Arrival:</div><div class="value">${arriveStr}</div>
+<div class="label">Aircraft:</div><div class="value">${realAircraft} (${realDistance} km)</div>
+<div id="map"></div>
+</div><script>
+const fromLat=${fromLat}; const fromLon=${fromLon}; const toLat=${toLat}; const toLon=${toLon};
+const map = L.map('map').setView([fromLat, fromLon], 4);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OpenStreetMap', maxZoom:18}).addTo(map);
+L.polyline([[fromLat,fromLon],[toLat,toLon]], {color:'#2563eb', dashArray:'6 8'}).addTo(map);
+L.marker([fromLat, fromLon]).addTo(map); L.marker([toLat, toLon]).addTo(map);
 <\/script></body></html>`);
 });
+  
 app.get('/health',(req,res)=> res.send('OK'));
 app.listen(PORT, ()=> console.log('SKYLINK FINAL - WORLD AIRPORTS + SIGNATURE + DARK CARGO READY '+PORT));
