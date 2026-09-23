@@ -716,24 +716,106 @@ initMap(); update(); setInterval(update,1000);
 <\/script></body></html>`);
   }
 
-  // FLIGHT - PLAIN WHITE SAME STYLE
-  return res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Live Flight ${b.tracking}</title>${leafletHead}
-<style>body{margin:0;font-family:Arial;background:#f1f5f9;padding:12px;display:flex;justify-content:center}.card{width:100%;max-width:540px;background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,.06);border:1px solid #e2e8f0}.label{font-size:11px;color:#64748b;font-weight:800;text-transform:uppercase;margin-top:10px}.value{font-size:13px;font-weight:800;color:#0f172a;margin-top:2px}</style></head><body><div class="card">
-<div style="display:flex;justify-content:space-between"><div style="font-weight:900">✈️ SKYLINK AIRLINES - Live Flight</div><div style="background:#dbeafe;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:900">${b.tracking}</div></div>
-<div class="label">Passenger:</div><div class="value">${b.name}</div>
-<div class="label">Flight:</div><div class="value">${b.flight} - ${realAircraft}</div>
-<div class="label">Route:</div><div class="value">${b.from} → ${b.to}</div>
-<div class="label">Departure:</div><div class="value">${departStr}</div>
-<div class="label">Duration:</div><div class="value">${totalH}h ${totalM}m</div>
-<div class="label">Arrival:</div><div class="value">${arriveStr}</div>
-<div class="label">Aircraft:</div><div class="value">${realAircraft} (${realDistance} km)</div>
+app.get('/track', async (req,res)=>{
+  const code=req.query.code;let b=bookings.get(code);
+  if(!b && BookingModel){try{const doc=await BookingModel.findOne({$or:[{tracking:code},{booking:code}]});if(doc)b=doc.toObject()}catch(e){}}
+  if(!b){try{const obj=JSON.parse(fs.readFileSync(DATA_FILE,'utf8')||'{}');b=obj[code]}catch(e){}}
+  if(!b){return res.send('<html><body style="font-family:Arial;padding:20px">Invalid Tracking Code - Not Found: '+code+'</body></html>');}
+  b = migrateOldBookingToReal(b);
+  const departISO = b.departISO;
+  const arriveISO = b.arriveISO;
+  const totalMs = new Date(arriveISO).getTime() - new Date(departISO).getTime();
+  const totalH = Math.floor(totalMs/3600000);
+  const totalM = Math.floor((totalMs%3600000)/60000);
+  let departStr = ''; let arriveStr = '';
+  try{
+    departStr = new Date(departISO).toLocaleString('en-US',{ timeZone: b.fromTz, month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true }) + ' ('+b.fromTz+')';
+    arriveStr = new Date(arriveISO).toLocaleString('en-US',{ timeZone: b.toTz, month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true }) + ' ('+b.toTz+')';
+  }catch(e){
+    departStr = new Date(departISO).toLocaleString('en-US',{month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true}) + ' ('+b.fromTz+')';
+    arriveStr = new Date(arriveISO).toLocaleString('en-US',{month:'long', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true}) + ' ('+b.toTz+')';
+  }
+  const realDetails = getFlightDetails(b.from, b.to);
+  const realAircraft = realDetails.aircraft;
+  const realDistance = b.distanceKm || realDetails.distanceKm;
+  const fromA = findAirport(b.from);
+  const toA = findAirport(b.to);
+  const fromLat = fromA.lat || 0;
+  const fromLon = fromA.lon || 0;
+  const toLat = toA.lat || 0;
+  const toLon = toA.lon || 0;
+  res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Live Flight Tracking ${b.tracking}</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<style>body{margin:0;background:#fff;font-family:Arial,Helvetica,sans-serif;padding:16px;color:#111}.container{max-width:700px}h2{margin:0 0 16px;font-size:18px;font-weight:700;display:flex;align-items:center;gap:6px}.line{margin:8px 0;font-size:14px}.label{font-weight:700}.value{font-weight:400}.divider{border:none;border-top:1.5px solid #1a2b5e;margin:16px 0}.live{margin-top:10px}.status-box{padding:6px 10px;border-radius:6px;font-weight:900;font-size:13px;display:inline-block}#map{width:100%;height:380px;border-radius:12px;border:1.5px solid #1a2b5e;margin-top:16px;z-index:1}.map-title{font-weight:900;margin-top:18px;font-size:14px}</style></head><body><div class="container">
+<h2>📍 Live Flight Tracking</h2>
+<div class="line"><span class="label">Tracking Code:</span> <span class="value">${b.tracking}</span></div>
+<div class="line"><span class="label">Passenger:</span> <span class="value">${b.name}</span></div>
+<div class="line"><span class="label">Flight:</span> <span class="value">${b.flight}</span></div>
+<div class="line"><span class="label">Route:</span> <span class="value">${b.from} → ${b.to} (${b.fromFull} to ${b.toFull})</span></div>
+<div class="line"><span class="label">Departure:</span> <span class="value">${departStr}</span></div>
+<div class="line"><span class="label">Est. Duration:</span> <span class="value">${totalH}h ${totalM}m${realDistance? ' | '+realDistance+'km':''}</span></div>
+<div class="line"><span class="label">Est. Arrival:</span> <span class="value">${arriveStr}</span></div>
+<div class="line"><span class="label">Aircraft:</span> <span class="value">${realAircraft}</span></div>
+<hr class="divider">
+<div class="live"><div style="font-weight:700;margin-bottom:8px">Live Status</div>
+<div class="line"><span class="label">Status:</span> <span id="status" class="status-box">Loading...</span></div>
+<div class="line"><span class="label">Time in Air:</span> <span id="timeInAir" class="value" style="font-weight:900;font-size:16px">Calculating...</span></div>
+<div class="line"><span class="label">Altitude:</span> <span id="alt" class="value">N/A</span></div>
+<div class="line"><span class="label">Speed:</span> <span id="spd" class="value">N/A</span></div>
+<div class="line" style="margin-top:12px;font-size:12px;color:#64748b"><span id="countdown"></span></div>
+</div>
+<div class="map-title">🗺️ Live Flight Map</div>
 <div id="map"></div>
-</div><script>
-const fromLat=${fromLat}; const fromLon=${fromLon}; const toLat=${toLat}; const toLon=${toLon};
-const map = L.map('map').setView([fromLat, fromLon], 4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OpenStreetMap', maxZoom:18}).addTo(map);
-L.polyline([[fromLat,fromLon],[toLat,toLon]], {color:'#2563eb', dashArray:'6 8'}).addTo(map);
-L.marker([fromLat, fromLon]).addTo(map); L.marker([toLat, toLon]).addTo(map);
+<div style="font-size:11px;color:#64748b;margin-top:6px;text-align:center">${b.from} ✈️ ${b.to} - Live Aircraft Position</div>
+</div>
+<script>
+const departISO="${departISO}";const arriveISO="${arriveISO}";
+const fromLat=${fromLat};const fromLon=${fromLon};const toLat=${toLat};const toLon=${toLon};
+const departMs=new Date(departISO).getTime();const arriveMs=new Date(arriveISO).getTime();const totalMs=arriveMs-departMs;
+const map = L.map('map').setView([(fromLat+toLat)/2, (fromLon+toLon)/2], 3);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18, attribution:'© OpenStreetMap'}).addTo(map);
+const routeLine = L.polyline([[fromLat, fromLon],[toLat, toLon]], {color:'#1a2b5e', weight:3, dashArray:'6,8', opacity:0.7}).addTo(map);
+L.marker([fromLat, fromLon]).addTo(map).bindPopup('${b.from} - Departure');
+L.marker([toLat, toLon]).addTo(map).bindPopup('${b.to} - Arrival');
+const planeIcon = L.divIcon({html:'✈️', className:'plane-icon', iconSize:[24,24]});
+const planeMarker = L.marker([fromLat, fromLon], {icon: planeIcon}).addTo(map);
+map.fitBounds(routeLine.getBounds(), {padding:[30,30]});
+function updateLive(){
+  const now=Date.now();const diff=now-departMs;const remain=arriveMs-now;
+  const statusEl=document.getElementById("status");const timeEl=document.getElementById("timeInAir");
+  const altEl=document.getElementById("alt");const spdEl=document.getElementById("spd");const cdEl=document.getElementById("countdown");
+  let progress=0;
+  if(diff<0){progress=0;const abs=Math.abs(diff);const hrs=Math.floor(abs/3600000);const mins=Math.floor((abs%3600000)/60000);const secs=Math.floor((abs%60000)/1000);
+    statusEl.innerText="Scheduled";statusEl.style.background="#dbeafe";statusEl.style.color="#1e40af";
+    timeEl.innerText="Not Departed";timeEl.style.color="#1e40af";
+    altEl.innerText="0 ft (On Ground)";spdEl.innerText="0 km/h";
+    cdEl.innerText="Departs in "+hrs+"h "+mins+"m "+secs+"s";
+  }else if(diff>=totalMs){progress=1;
+    statusEl.innerText="Landed ✅";statusEl.style.background="#dcfce7";statusEl.style.color="#166534";
+    const th=Math.floor(totalMs/3600000);const tm=Math.floor((totalMs%3600000)/60000);
+    timeEl.innerText=th+"h "+tm+"m (Flight Completed)";timeEl.style.color="#16a34a";
+    altEl.innerText="0 ft (Landed)";spdEl.innerText="0 km/h";
+    cdEl.innerText="Flight completed at "+new Date(arriveISO).toLocaleString();
+  }else{
+    progress=Math.min(1, Math.max(0, diff/totalMs));
+    const h=Math.floor(diff/3600000);const m=Math.floor((diff%3600000)/60000);const s=Math.floor((diff%60000)/1000);
+    let stat="Cruising ✈️";let alt=0;let spd=0;
+    if(diff<5*60000){stat="Boarding / Taxiing";alt=0;spd=25}
+    else if(diff<15*60000){stat="Departed - Climbing";const prog=(diff-5*60000)/(10*60000);alt=Math.floor(prog*35000);spd=Math.floor(250+prog*300)}
+    else if(diff>totalMs-20*60000){stat="Descending";const prog=(totalMs-diff)/(20*60000);alt=Math.floor(prog*35000);spd=Math.floor(300+prog*400)}
+    else{stat="Cruising ✈️";alt=35000;spd=880}
+    statusEl.innerText=stat;statusEl.style.background="#dcfce7";statusEl.style.color="#166534";
+    timeEl.innerText=h+"h "+m+"m "+s+"s";timeEl.style.color="#16a34a";
+    altEl.innerText=alt.toLocaleString()+" ft";spdEl.innerText=spd+" km/h";
+    const rh=Math.floor(remain/3600000);const rm=Math.floor((remain%3600000)/60000);const rs=Math.floor((remain%60000)/1000);
+    cdEl.innerText=rh+"h "+rm+"m "+rs+"s remaining";
+  }
+  const curLat = fromLat + (toLat - fromLat)*progress;
+  const curLon = fromLon + (toLon - fromLon)*progress;
+  planeMarker.setLatLng([curLat, curLon]);
+}
+updateLive();setInterval(updateLive,1000);
 <\/script></body></html>`);
 });
   
