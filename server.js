@@ -236,33 +236,96 @@ app.get('/logistics-receipt', async (req,res)=>{
   const durH = Math.floor(b.durationMins/60); const durM = b.durationMins%60; const initials = b.name.split(' ').map(n=>n[0]).join('');
   res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${b.tracking}</title><script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;background:#efefef;font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;padding:12px}.paper{width:100%;max-width:780px;background:#fff;padding:0;box-shadow:0 10px 30px rgba(0,0,0,.2);border:1px solid #cbd5e1}.hdr{background:#1e3a5f;color:#fff;text-align:center;padding:10px 12px}.hdr h1{margin:0;font-size:22px;font-weight:900}.hdr p{margin:2px 0 0;font-size:11px;font-weight:700;letter-spacing:0.8px}.track{text-align:center;font-weight:900;margin:10px 0 8px;font-size:14px;line-height:1.2}.track span{color:#1e3a5f;text-decoration:underline;text-underline-offset:4px;font-size:18px}.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;border-top:1px solid #1e3a5f;padding:8px 12px;margin-top:6px}.col h3{margin:0 0 4px;font-size:12px;font-weight:900;color:#1e3a5f;text-decoration:underline}.ln{font-size:11px;line-height:1.4}.ship-h{background:#1e3a5f;color:#fff;text-align:center;font-weight:900;padding:6px;font-size:12px}table{width:100%;border-collapse:collapse;font-size:11px}td{border:1px solid #9ca3af;padding:5px 6px}.yellow{background:#fef3c7}.bar{border:1px solid #9ca3af;margin:10px 8px 0;padding:6px 8px;display:grid;grid-template-columns:100px 1fr;gap:10px;align-items:center}.bar-h{font-size:11px;font-weight:900;color:#1e3a5f;margin-bottom:4px}.footer{margin:8px;text-align:center;font-size:7.5px;color:#334155;line-height:1.3}.footer2{text-align:right;font-size:7.5px;color:#334155;margin:0 8px 8px}.btn-area{display:flex;gap:8px;margin-top:14px;justify-content:center;flex-wrap:wrap}.btn{background:#0f2e6d;color:#fff;border:none;padding:10px 16px;border-radius:8px;font-weight:900;cursor:pointer;font-size:12px}.btng{background:#16a34a;color:#fff;border:none;padding:10px 16px;border-radius:8px;font-weight:900;cursor:pointer;font-size:12px}</style></head><body><div class="paper" id="capture"><div class="hdr"><h1>SKYLINK LOGISTICS</h1><p>OFFICIAL SHIPMENT RECEIPT</p></div><div class="track">Tracking Code:<br><span>${b.tracking}</span></div><div class="cols"><div class="col"><h3>SENDER:</h3><div class="ln"><b>Name:</b> ${b.name}</div><div class="ln"><b>Phone:</b> ${b.phone||''}</div><div class="ln"><b>Email:</b> ${b.email||''}</div><div class="ln"><b>Address:</b> ${b.fromFull||''}</div></div><div class="col"><h3>RECEIVER:</h3><div class="ln"><b>Name:</b> ${b.receiver||''}</div><div class="ln"><b>Phone:</b> ${b.receiverPhone||''}</div><div class="ln"><b>Country:</b> ${b.receiverCountry||''}</div><div class="ln"><b>House Address:</b> ${b.receiverAddress||''}</div><div class="ln"><b>Email:</b> ${b.receiverEmail||''}</div></div></div><div class="ship"><div class="ship-h">SHIPMENT DETAILS</div><table><tr><td style="width:22%"><b>Package Description:</b></td><td class="yellow" style="width:33%">${b.desc||''}</td><td style="width:18%"><b>Weight:</b></td><td>${b.weight||''}</td></tr><tr><td><b>Packages:</b></td><td>1 Box</td><td><b>Declared Value:</b></td><td>NGN ${b.amount||3000}</td></tr><tr><td><b>Aircraft:</b></td><td>${b.aircraft||'Boeing 747-400F Cargo'}</td><td><b>Flight:</b></td><td>${b.flight}</td></tr><tr><td><b>Departure:</b></td><td>${b.from}</td><td><b>Arrival:</b></td><td>${b.to}</td></tr><tr><td><b>Duration:</b></td><td>${durH}h ${durM}m</td><td><b>Service:</b></td><td>AIR CARGO EXPRESS</td></tr><tr><td><b>Distance:</b></td><td>${b.distanceKm} km</td><td></td><td></td></tr></table></div><div class="bar"><div><div class="bar-h">BARCODE & QR CODE</div>${qrHtml}</div><div><div style="text-align:center"><div style="font-family:monospace;font-size:14px;letter-spacing:1px">|||||||| |||| |||| ||||| ||| ||||||</div><div style="font-size:10px;font-weight:800;margin-top:2px">III · ${b.tracking} · III</div></div><div style="margin-top:10px;border-top:1px solid #e5e7eb;padding-top:6px"><div style="text-align:center;font-weight:900;font-size:11px;color:#1e3a5f;margin-bottom:8px">SIGNATURES</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><div style="font-size:10px;font-weight:800">Sender Signature:</div><div style="margin-top:8px">${senderSig}<div style="border-top:1px solid #9ca3af;margin-top:8px;padding-top:4px;font-size:8px">Initials: ${initials} &nbsp;&nbsp;&nbsp; Date: ${new Date(b.createdAt).toLocaleDateString('en-GB')}</div></div></div><div><div style="font-size:10px;font-weight:800">Receiver Signature:</div><div style="border:1px dashed #9ca3af;height:50px;margin-top:6px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#94a3b8">[ ]</div><div style="font-size:8px;text-align:center;margin-top:4px;color:#64748b">Awaiting Receiver Signature</div></div></div></div></div></div><div class="footer">This is an official SKYLINK LOGISTICS shipment receipt.</div><div class="footer2">Issued: ${new Date(b.createdAt).toLocaleDateString('en-GB')} • Receipt No: SKY-REC-${Math.floor(10000+Math.random()*89999)}</div></div><div class="btn-area" id="btns"><button class="btng" onclick="html2canvas(document.getElementById('capture'),{scale:3,backgroundColor:'#ffffff'}).then(c=>{let a=document.createElement('a');a.download='SKYLINK-${b.tracking}-HD.png';a.href=c.toDataURL('image/png',1.0);a.click();})">Download Bright HD</button><button class="btn" onclick="location.href='/logistics-track?code=${b.tracking}'">Live Track</button></div></div></body></html>`);
 });
+// REAL SHIPMENT TRACKING - NO FLIGHT - REAL LOGISTICS LANGUAGE
 app.get('/logistics-track', async (req,res)=>{
   const code=req.query.code;let b=bookings.get(code);
   if(!b && BookingModel){try{const doc=await BookingModel.findOne({$or:[{tracking:code},{booking:code}]});if(doc)b=doc.toObject()}catch(e){}}
   if(!b){try{const obj=JSON.parse(fs.readFileSync(DATA_FILE,'utf8')||'{}');b=obj[code]}catch(e){}}
-  if(!b) return res.send('<html><body>Invalid Logistics Tracking Code: '+code+'</body></html>');
+  if(!b) return res.send('<html><body style="font-family:Arial;padding:20px">Invalid Shipment Code: '+code+'</body></html>');
   b = migrateOldBookingToReal(b);
-  const departISO=b.departISO, arriveISO=b.arriveISO; const fromA=findAirport(b.from), toA=findAirport(b.to); const departStr=formatRealInTz(departISO,b.fromTz), arriveStr=formatRealInTz(arriveISO,b.toTz); const totalMs=new Date(arriveISO).getTime()-new Date(departISO).getTime(); const totalH=Math.floor(totalMs/3600000), totalM=Math.floor((totalMs%3600000)/60000);
-  res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Logistics Live ${b.tracking}</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script><style>body{margin:0;background:#fff;font-family:Arial;padding:16px;color:#111}.container{max-width:700px}h2{margin:0 0 16px;font-size:18px;font-weight:700}.line{margin:8px 0;font-size:14px}.label{font-weight:700}.divider{border:none;border-top:1.5px solid #1a2b5e;margin:16px 0}.status-box{padding:6px 10px;border-radius:6px;font-weight:900;font-size:13px;display:inline-block}#map{width:100%;height:380px;border-radius:12px;border:1.5px solid #1a2b5e;margin-top:16px;z-index:1}</style></head><body><div class="container"><h2>📦 Live Shipment Tracking</h2><div class="line"><span class="label">Tracking Code:</span> ${b.tracking}</div><div class="line"><span class="label">Sender:</span> ${b.name} - ${b.fromFull}</div><div class="line"><span class="label">Receiver:</span> ${b.receiver} - ${b.receiverPhone||''} - ${b.receiverCountry||''} - ${b.receiverAddress||''}</div><div class="line"><span class="label">Package:</span> ${b.desc||''} - ${b.weight||''}</div><div class="line"><span class="label">Flight:</span> ${b.flight} | ${b.from} → ${b.to}</div><div class="line"><span class="label">Departure:</span> ${departStr}</div><div class="line"><span class="label">Est. Duration:</span> ${totalH}h ${totalM}m | ${b.distanceKm||6000}km</div><div class="line"><span class="label">Est. Arrival:</span> ${arriveStr}</div><hr class="divider"><div style="font-weight:700;margin-bottom:8px">Live Status</div><div class="line"><span class="label">Status:</span> <span id="status" class="status-box">Loading...</span></div><div class="line"><span class="label">Time in Air:</span> <span id="timeInAir" style="font-weight:900;font-size:16px">Calculating...</span></div><div class="line"><span class="label">Altitude:</span> <span id="alt">N/A</span></div><div class="line"><span class="label">Speed:</span> <span id="spd">N/A</span></div><div class="line" style="font-size:12px;color:#64748b"><span id="countdown"></span></div><div style="font-weight:900;margin-top:18px">🗺️ Live Shipment Map</div><div id="map"></div></div><script>
-const departISO="${departISO}",arriveISO="${arriveISO}",fromLat=${fromA.lat||15},fromLon=${fromA.lon||45},toLat=${toA.lat||20},toLon=${toA.lon||50};
-const departMs=new Date(departISO).getTime(),arriveMs=new Date(arriveISO).getTime(),totalMs=arriveMs-departMs;
-const map=L.map('map').setView([(fromLat+toLat)/2,(fromLon+toLon)/2],3);
+  const departISO=b.departISO, arriveISO=b.arriveISO;
+  const fromA=findAirport(b.from), toA=findAirport(b.to);
+  const departStr=formatRealInTz(departISO,b.fromTz), arriveStr=formatRealInTz(arriveISO,b.toTz);
+  const totalMs=new Date(arriveISO).getTime()-new Date(departISO).getTime();
+  const totalH=Math.floor(totalMs/3600000), totalM=Math.floor((totalMs%3600000)/60000);
+  const realDetails=getFlightDetails(b.from, b.to);
+  const realDistance = b.distanceKm || realDetails.distanceKm;
+  const fromLat=fromA.lat||15.0, fromLon=fromA.lon||45.0, toLat=toA.lat||20.0, toLon=toA.lon||50.0;
+  
+  res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shipment ${b.tracking}</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<style>body{margin:0;background:#fff;font-family:Arial,Helvetica,sans-serif;padding:16px;color:#111}.container{max-width:700px}h2{margin:0 0 16px;font-size:18px;font-weight:800}.line{margin:9px 0;font-size:14px;line-height:1.5}.label{font-weight:800}.value{font-weight:400}.divider{border:none;border-top:1.5px solid #1a2b5e;margin:16px 0}.status-box{padding:6px 10px;border-radius:6px;font-weight:900;font-size:13px;display:inline-block}#map{width:100%;height:420px;border-radius:12px;border:1.5px solid #1a2b5e;margin-top:16px;z-index:1}.map-title{font-weight:900;margin-top:18px;font-size:14px}</style></head><body><div class="container">
+<h2>📦 Live Shipment Tracking</h2>
+<div class="line"><span class="label">Tracking Code:</span> <span class="value">${b.tracking}</span></div>
+<div class="line"><span class="label">Sender:</span> <span class="value">${b.name} - ${b.fromFull}</span></div>
+<div class="line"><span class="label">Receiver:</span> <span class="value">${b.receiver} - ${b.receiverPhone||''} - ${b.receiverCountry||''} - ${b.receiverAddress||''}</span></div>
+<div class="line"><span class="label">Package Description:</span> <span class="value">${b.desc||''}</span></div>
+<div class="line"><span class="label">Weight:</span> <span class="value">${b.weight||''} | 1 Box</span></div>
+<div class="line"><span class="label">Origin:</span> <span class="value">${b.fromFull}</span></div>
+<div class="line"><span class="label">Destination:</span> <span class="value">${b.toFull}</span></div>
+<div class="line"><span class="label">Shipment Date:</span> <span class="value">${departStr}</span></div>
+<div class="line"><span class="label">Estimated Delivery:</span> <span class="value">${arriveStr}</span></div>
+<div class="line"><span class="label">Distance:</span> <span class="value">${realDistance} km</span></div>
+<div class="line"><span class="label">Service:</span> <span class="value">SKYLINK AIR CARGO EXPRESS - Door to Door</span></div>
+<hr class="divider">
+<div style="font-weight:800;margin-bottom:8px">Live Shipment Status</div>
+<div class="line"><span class="label">Status:</span> <span id="status" class="status-box">Loading...</span></div>
+<div class="line"><span class="label">Time in Transit:</span> <span id="timeInAir" style="font-weight:900;font-size:16px">Calculating...</span></div>
+<div class="line"><span class="label">Current Location:</span> <span id="currentLoc">Calculating...</span></div>
+<div class="line" style="margin-top:12px;font-size:12px;color:#64748b"><span id="countdown"></span></div>
+</div>
+<div class="map-title">🗺️ Live Shipment Map - Real Route Tracking</div>
+<div id="map"></div>
+<div style="font-size:11px;color:#64748b;margin-top:6px;text-align:center">${b.from} → ${b.to} - Live Shipment Position - ${realDistance}km - SKYLINK LOGISTICS</div>
+</div>
+<script>
+const departISO="${departISO}";const arriveISO="${arriveISO}";
+const fromLat=${fromLat};const fromLon=${fromLon};const toLat=${toLat};const toLon=${toLon};
+const departMs=new Date(departISO).getTime();const arriveMs=new Date(arriveISO).getTime();const totalMs=arriveMs-departMs;
+const map = L.map('map').setView([(fromLat+toLat)/2, (fromLon+toLon)/2], 3);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18, attribution:'© OpenStreetMap'}).addTo(map);
-const route=L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:'#1a2b5e',weight:3,dashArray:'6,8',opacity:0.7}).addTo(map);
-L.marker([fromLat,fromLon]).addTo(map).bindPopup('${b.from} Departure');L.marker([toLat,toLon]).addTo(map).bindPopup('${b.to} Arrival');
-const icon=L.divIcon({html:'📦',className:'',iconSize:[24,24]});const marker=L.marker([fromLat,fromLon],{icon}).addTo(map);
-map.fitBounds(route.getBounds(),{padding:[30,30]});
-function upd(){const now=Date.now(),diff=now-departMs,remain=arriveMs-now;
-const sEl=document.getElementById('status'),tEl=document.getElementById('timeInAir'),aEl=document.getElementById('alt'),spEl=document.getElementById('spd'),cEl=document.getElementById('countdown');
-let prog=0;
-if(diff<0){prog=0;const abs=Math.abs(diff),h=Math.floor(abs/3600000),m=Math.floor((abs%3600000)/60000),sec=Math.floor((abs%60000)/1000);
-sEl.innerText='Scheduled';sEl.style.background='#dbeafe';sEl.style.color='#1e40af';tEl.innerText='Not Departed';aEl.innerText='0 ft';spEl.innerText='0 km/h';cEl.innerText='Departs in '+h+'h '+m+'m '+sec+'s';}
-else if(diff>=totalMs){prog=1;sEl.innerText='Delivered ✅';sEl.style.background='#dcfce7';sEl.style.color='#166534';const th=Math.floor(totalMs/3600000),tm=Math.floor((totalMs%3600000)/60000);tEl.innerText=th+'h '+tm+'m (Completed)';aEl.innerText='0 ft (Delivered)';spEl.innerText='0 km/h';cEl.innerText='Completed at '+new Date(arriveISO).toLocaleString();}
-else{prog=Math.min(1,diff/totalMs);const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);let stat='In Transit 📦',alt=35000,spd=880;
-if(diff<5*60000){stat='Preparing 📦';alt=0;spd=25}else if(diff<15*60000){const p=(diff-5*60000)/(10*60000);alt=Math.floor(p*35000);spd=Math.floor(250+p*300);stat='Departed - Climbing'}else if(diff>totalMs-20*60000){const p=(totalMs-diff)/(20*60000);alt=Math.floor(p*35000);spd=Math.floor(300+p*400);stat='Descending';}
-sEl.innerText=stat;sEl.style.background='#dcfce7';sEl.style.color='#166534';tEl.innerText=h+'h '+m+'m '+s+'s';tEl.style.color='#16a34a';aEl.innerText=alt.toLocaleString()+' ft';spEl.innerText=spd+' km/h';const rh=Math.floor(remain/3600000),rm=Math.floor((remain%3600000)/60000),rs=Math.floor((remain%60000)/1000);cEl.innerText=rh+'h '+rm+'m '+rs+'s remaining';}
-const curLat=fromLat+(toLat-fromLat)*prog,curLon=fromLon+(toLon-fromLon)*prog;marker.setLatLng([curLat,curLon]);}
-upd();setInterval(upd,1000);
+const routeLine = L.polyline([[fromLat, fromLon],[toLat, toLon]], {color:'#0f2e6d', weight:4, dashArray:'8,10', opacity:0.8}).addTo(map);
+L.marker([fromLat, fromLon]).addTo(map).bindPopup('Origin: ${b.from}<br>${b.fromFull}');
+L.marker([toLat, toLon]).addTo(map).bindPopup('Destination: ${b.to}<br>${b.toFull}');
+const cargoIcon = L.divIcon({html:'📦', className:'cargo-icon', iconSize:[30,30]});
+const cargoMarker = L.marker([fromLat, fromLon], {icon: cargoIcon}).addTo(map);
+map.fitBounds(routeLine.getBounds(), {padding:[40,40]});
+function updateLive(){
+  const now=Date.now();const diff=now-departMs;const remain=arriveMs-now;
+  const statusEl=document.getElementById("status");const timeEl=document.getElementById("timeInAir");
+  const locEl=document.getElementById("currentLoc");const cdEl=document.getElementById("countdown");
+  let progress=0;
+  if(diff<0){
+    progress=0;
+    const abs=Math.abs(diff);const hrs=Math.floor(abs/3600000);const mins=Math.floor((abs%3600000)/60000);const secs=Math.floor((abs%60000)/1000);
+    statusEl.innerText="Shipment Booked - Awaiting Dispatch";statusEl.style.background="#fef3c7";statusEl.style.color="#92400e";
+    timeEl.innerText="Not Dispatched";locEl.innerText="${b.fromFull} - Warehouse";
+    cdEl.innerText="Dispatch in "+hrs+"h "+mins+"m "+secs+"s";
+  }else if(diff>=totalMs){
+    progress=1;
+    statusEl.innerText="Delivered ✅";statusEl.style.background="#dcfce7";statusEl.style.color="#166534";
+    const th=Math.floor(totalMs/3600000);const tm=Math.floor((totalMs%3600000)/60000);
+    timeEl.innerText=th+"h "+tm+"m (Delivered)";locEl.innerText="${b.toFull} - Delivered to Receiver";
+    cdEl.innerText="Delivered on "+new Date(arriveISO).toLocaleString();
+  }else{
+    progress=Math.min(1, Math.max(0, diff/totalMs));
+    const h=Math.floor(diff/3600000);const m=Math.floor((diff%3600000)/60000);const s=Math.floor((diff%60000)/1000);
+    let stat="In Transit";let loc="In Transit";
+    if(diff<10*60000){stat="Processing at Origin Facility";loc="${b.fromFull} - Sorting Facility"}
+    else if(diff<30*60000){stat="Departed Origin - In Transit";loc="En route from ${b.from} to ${b.to}"}
+    else if(diff>totalMs-30*60000){stat="Arrived Destination - Out for Delivery";loc="${b.toFull} - Out for Delivery to ${b.receiverAddress||''}"}
+    else{stat="In Transit - On the Way";loc="In Transit - ${Math.floor(progress*100)}% completed"}
+    statusEl.innerText=stat;statusEl.style.background="#dbeafe";statusEl.style.color="#1e40af";
+    timeEl.innerText=h+"h "+m+"m "+s+"s";timeEl.style.color="#0f2e6d";
+    locEl.innerText=loc;
+    const rh=Math.floor(remain/3600000);const rm=Math.floor((remain%3600000)/60000);const rs=Math.floor((remain%60000)/1000);
+    cdEl.innerText=rh+"h "+rm+"m "+rs+"s remaining - ETA "+new Date(arriveISO).toLocaleString()+" - ${b.toFull}";
+  }
+  const curLat = fromLat + (toLat - fromLat)*progress;
+  const curLon = fromLon + (toLon - fromLon)*progress;
+  cargoMarker.setLatLng([curLat, curLon]);
+}
+updateLive();setInterval(updateLive,1000);
 <\/script></body></html>`);
 });
 app.get('/health',(req,res)=> res.send('OK'));
