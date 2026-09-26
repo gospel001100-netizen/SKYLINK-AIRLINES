@@ -192,46 +192,7 @@ initDB();
 app.get('/skylink-admin-login', (req,res)=>{ res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#0f2e6d;display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial}.card{background:#fff;padding:30px;border-radius:16px;width:100%;max-width:360px;box-shadow:0 10px 40px rgba(0,0,0,.3)}input{width:100%;padding:13px;border-radius:10px;border:1.5px solid #e2e8f0;margin-top:12px;box-sizing:border-box;font-size:14px}button{width:100%;background:#0f2e6d;color:#fff;padding:13px;border-radius:10px;border:none;font-weight:900;margin-top:14px;cursor:pointer}</style></head><body><div class="card"><div style="text-align:center;font-weight:900;font-size:20px">✈️ SKYLINK ADMIN</div><div style="text-align:center;font-size:11px;color:#64748b;margin-top:6px;letter-spacing:1px">ADMIN LOGIN ONLY</div><form method="POST" action="/api/admin-login"><input type="password" name="password" placeholder="Enter admin password" required><button type="submit">Login →</button></form></div></body></html>`);});
 app.post('/api/admin-login', (req,res)=>{ const pass = req.body.password || ''; if(pass === ADMIN_PASSWORD){ res.setHeader('Set-Cookie', 'admin_auth=Skylink1824; Path=/; Max-Age=86400; HttpOnly'); res.redirect('/skylink-admin-gospel-2024'); } else { res.send('<script>alert("Wrong password"); location.href="/skylink-admin-login"</script>'); } });
 app.get('/skylink-admin-logout', (req,res)=>{ res.setHeader('Set-Cookie', 'admin_auth=; Path=/; Max-Age=0'); res.redirect('/skylink-admin-login'); });
-// NEW HOMEPAGE - 2 OPTIONS
 app.get('/', (req,res)=>{
-  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SKYLINK</title><style>
-body{margin:0;font-family:Inter,Arial;background:#f1f5f9;display:flex;justify-content:center;padding:20px;min-height:100vh;align-items:center}
-.card{width:100%;max-width:700px;background:#fff;border-radius:24px;padding:30px;box-shadow:0 12px 40px rgba(0,0,0,.1);border:1px solid #e2e8f0;text-align:center}
-.pill{background:#0f2e6d;color:#fff;padding:14px 26px;border-radius:30px;font-weight:900;font-size:18px;display:inline-flex;gap:8px}
-.pill span{color:#FACC15}
-.sub{font-size:11px;color:#64748b;font-weight:800;margin:12px 0 24px;letter-spacing:1px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:600px){.grid{grid-template-columns:1fr}}
-.option{border:2px solid #e2e8f0;border-radius:18px;padding:22px;cursor:pointer;transition:.2s;background:#f8fafc;text-decoration:none;color:#0f172a;display:block}
-.option:hover{border-color:#0f2e6d;background:#fff;transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,.08)}
-.icon{font-size:36px;margin-bottom:10px}
-.title{font-weight:900;font-size:16px}
-.desc{font-size:12px;color:#64748b;margin-top:6px;font-weight:600}
-.price{margin-top:10px;background:#0f2e6d;color:#fff;display:inline-block;padding:6px 14px;border-radius:20px;font-weight:900;font-size:12px}
-.price.log{background:#16a34a}
-</style></head><body><div class="card">
-<div class="pill">✈️ SKYLINK <span>GROUP</span></div>
-<div class="sub">OFFICIAL PORTAL - CHOOSE SERVICE</div>
-<div class="grid">
-<a class="option" href="/flights">
-<div class="icon">✈️</div>
-<div class="title">SKYLINK AIRLINES</div>
-<div class="desc">Book flights to 150+ airports worldwide<br>Real-time tracking & boarding pass</div>
-<div class="price">NGN 2,150</div>
-</a>
-<a class="option" href="/logistics">
-<div class="icon">📦</div>
-<div class="title">SKYLINK LOGISTICS</div>
-<div class="desc">Cargo Plane + Delivery Van<br>Real tracking with sender/receiver details</div>
-<div class="price log">NGN 3,000</div>
-</a>
-</div>
-<div style="margin-top:20px;font-size:11px;color:#94a3b8">Licensed & Approved • Secure Paystack Payments • Permanent Records</div>
-</div></body></html>`);
-});
-
-// YOUR V9 AIRLINES MOVED TO /flights - 100% UNTOUCHED
-app.get('/flights', (req,res)=>{
   const aj = JSON.stringify(AIRPORTS);
   const pk = process.env.PAYSTACK_PUBLIC_KEY || 'pk_live_d820c59c33c0628f48f10176e8ff25b243fd6c73';
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>SKYLINK AIRLINES</title><script src="https://js.paystack.co/v1/inline.js"><\/script><style>
@@ -256,12 +217,9 @@ input:focus{background:#fff;border-color:#0f2e6d}
 #step2{display:none}
 .warning{background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:12px;font-weight:800;font-size:13px;color:#92400E;text-align:center;margin-bottom:12px}
 .summary{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;font-size:14px;line-height:1.6;margin-bottom:12px}
-.top-links{display:flex;gap:10px;justify-content:center;margin-bottom:14px}
-.top-links a{background:#fff;border:1.5px solid #0f2e6d;color:#0f2e6d;padding:8px 14px;border-radius:20px;font-weight:800;font-size:12px;text-decoration:none}
 </style></head><body><div class="wrapper"><div class="card">
 <div class="header"><div class="pill">✈️ SKYLINK <span>AIRLINES</span></div></div>
 <div class="sub">OFFICIAL BOOKING PORTAL</div>
-<div class="top-links"><a href="/">🏠 Home</a><a href="/logistics">📦 Logistics</a></div>
 <div id="step1">
 <form onsubmit="goToPayment(event)">
 <label>Full Name *</label><input id="pname" required placeholder="As on passport" autocomplete="off">
@@ -338,73 +296,6 @@ function payWithPaystack(){
 }
 document.addEventListener("click",function(e){if(!e.target.closest(".rel"))document.querySelectorAll(".suggest").forEach(function(s){s.style.display="none"})});
 <\/script></body></html>`);
-});
-// ===== FINAL SKYLINK LOGISTICS DHL - CLEAN - NO BUGS =====
-app.get('/logistics',(req,res)=>{
-  const aj=JSON.stringify(AIRPORTS);
-  const pk=process.env.PAYSTACK_PUBLIC_KEY||'pk_live_d820c59c33c0628f48f10176e8ff25b243fd6c73';
-  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>SKYLINK LOGISTICS</title><script src="https://js.paystack.co/v1/inline.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial;background:#f1f5f9;display:flex;justify-content:center;padding:12px}.card{width:100%;max-width:600px;background:#fff;border-radius:24px;padding:22px;box-shadow:0 12px 30px rgba(0,0,0,.08);border:1px solid #e2e8f0}.pill{background:#16a34a;color:#fff;padding:12px 22px;border-radius:30px;font-weight:900}.sub{font-size:11px;color:#64748b;font-weight:800;text-align:center;margin:8px 0}.top{display:flex;gap:8px;justify-content:center;margin-bottom:14px}.top a{font-weight:800;font-size:12px;border:1.5px solid #0f2e6d;padding:7px 14px;border-radius:20px;text-decoration:none;color:#0f2e6d}label{font-weight:800;font-size:12px;margin-top:14px;display:block}input,textarea,select{width:100%;padding:14px;border:1.5px solid #e2e8f0;border-radius:12px;margin-top:6px;font-size:15px;background:#f8fafc}input:focus,textarea:focus{background:#fff;border-color:#16a34a;outline:none}.btn{width:100%;background:#16a34a;color:#fff;padding:16px;border:none;border-radius:12px;font-weight:900;margin-top:18px;cursor:pointer}.rel{position:relative}.suggest{position:absolute;background:#fff;border:1px solid #e2e8f0;border-radius:10px;max-height:180px;overflow:auto;width:100%;z-index:20;display:none}.suggest div{padding:10px 12px;font-size:13px;font-weight:700;cursor:pointer;border-bottom:1px solid #f1f5f9}.sec{font-size:13px;font-weight:900;background:#f1f5f9;padding:8px 12px;border-radius:8px;margin-top:18px;border-left:4px solid #16a34a}</style></head><body><div class="card"><div style="text-align:center"><div class="pill">📦 SKYLINK LOGISTICS</div><div class="sub">OFFICIAL CARGO PORTAL • REAL TRACKING</div><div class="top"><a href="/">🏠 Home</a><a href="/flights">✈️ Flights</a></div></div>
-<form onsubmit="shipCargo(event)">
-<div class="sec">👤 SENDER</div>
-<label>Sender Full Name *</label><input id="sName" required>
-<label>Sender Phone *</label><input id="sPhone" required placeholder="+1... or +967...">
-<label>Sender Email *</label><input id="sEmail" type="email" required>
-<label>Sender Address *</label><textarea id="sAddr" required></textarea>
-<label>Origin Airport *</label><div class="rel"><input id="from" autocomplete="off" oninput="suggest('from')" placeholder="e.g. SAH - Sanaa, Yemen" required><div id="from-suggest" class="suggest"></div></div>
-<div class="sec">📍 RECEIVER</div>
-<label>Receiver Full Name *</label><input id="rName" required>
-<label>Receiver Phone *</label><input id="rPhone" required placeholder="+1... or +234...">
-<label>Receiver Email *</label><input id="rEmail" type="email" required>
-<label>Delivery Address *</label><textarea id="rAddr" required placeholder="Where delivery van will deliver"></textarea>
-<label>Destination Airport *</label><div class="rel"><input id="to" autocomplete="off" oninput="suggest('to')" placeholder="e.g. LOS - Lagos" required><div id="to-suggest" class="suggest"></div></div>
-<div class="sec">📦 CARGO</div>
-<label>Items Inside *</label><textarea id="items" required placeholder="e.g. Laptop, 3 shirts, documents"></textarea>
-<label>Weight *</label><select id="weight" required><option value="">Select</option><option>0.5kg</option><option>1kg</option><option>2kg</option><option>5kg</option><option>10kg</option><option>15kg</option><option>20kg</option><option>25kg+</option></select>
-<label>Extra Note</label><textarea id="pkg" placeholder="Fragile etc"></textarea>
-<button class="btn" type="submit">Ship Cargo Now →</button>
-</form>
-<div style="display:flex;gap:8px;margin-top:14px"><input id="trk" placeholder="LOG-XXXXXX" style="flex:1;padding:14px;border-radius:10px;border:1.5px solid #e2e8f0"><button onclick="if(document.getElementById('trk').value) location.href='/logistics-track?code='+document.getElementById('trk').value" style="background:#0f2e6d;color:#fff;border:none;padding:14px 18px;border-radius:10px;font-weight:800">Track</button></div>
-</div>
-<script>
-const airports=${aj};const PAYSTACK_PUBLIC_KEY="${pk}";let fromCode=null,toCode=null;
-function suggest(t){const i=document.getElementById(t),b=document.getElementById(t+"-suggest"),q=i.value.toLowerCase();if(!q){b.style.display="none";return}const f=airports.filter(a=>(a.code+" "+a.city+" "+a.country+" "+a.name).toLowerCase().includes(q)).slice(0,12);if(!f.length){b.style.display="none";return}b.innerHTML=f.map(a=>"<div onclick=\\"pick('"+t+"','"+a.code+"')\\"><b>"+a.code+"</b> - "+a.city+", "+a.country+"</div>").join("");b.style.display="block"}
-function pick(t,c){const a=airports.find(x=>x.code===c);document.getElementById(t).value=a.code+" - "+a.city+", "+a.country+" ("+a.name+")";if(t==='from')fromCode=c;else toCode=c;document.getElementById(t+"-suggest").style.display="none"}
-function shipCargo(e){e.preventDefault();const data={sName:document.getElementById('sName').value.trim(),sPhone:document.getElementById('sPhone').value.trim(),sEmail:document.getElementById('sEmail').value.trim(),sAddr:document.getElementById('sAddr').value.trim(),from:fromCode||document.getElementById('from').value.split(' ')[0].toUpperCase(),rName:document.getElementById('rName').value.trim(),rPhone:document.getElementById('rPhone').value.trim(),rEmail:document.getElementById('rEmail').value.trim(),rAddr:document.getElementById('rAddr').value.trim(),to:toCode||document.getElementById('to').value.split(' ')[0].toUpperCase(),items:document.getElementById('items').value.trim(),weight:document.getElementById('weight').value,pkg:document.getElementById('pkg').value.trim()};if(!data.from||!data.to||!data.items||!data.weight){alert('Fill all required');return}var btn=e.target.querySelector('button');btn.innerText='Processing...';btn.disabled=true;var h=PaystackPop.setup({key:PAYSTACK_PUBLIC_KEY,email:data.sEmail,amount:3000*100,currency:'NGN',ref:'LOG-'+Math.floor(Math.random()*1000000000),onClose:function(){btn.innerText='Ship Cargo Now →';btn.disabled=false},callback:function(r){fetch('/api/logistics/book',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,paystackRef:r.reference})}).then(x=>x.json()).then(j=>{if(j.trackingUrl)location.href=j.trackingUrl;else{alert(j.error);btn.disabled=false}}).catch(err=>{alert(err.message);btn.disabled=false})}});h.openIframe()}
-document.addEventListener('click',function(e){if(!e.target.closest('.rel'))document.querySelectorAll('.suggest').forEach(s=>s.style.display='none')});
-<\/script></body></html>`);
-});
-
-app.post('/api/logistics/book', async (req,res)=>{
-  try{
-    const {sName,sPhone,sEmail,sAddr,from,rName,rPhone,rEmail,rAddr,to,items,weight,pkg}=req.body;
-    if(!sName||!from||!to||!rName||!items||!weight) return res.status(400).json({error:'Missing fields'});
-    const code='LOG-'+Math.random().toString(36).substring(2,8).toUpperCase();
-    const fromA=AIRPORTS.find(a=>a.code===from); const toA=AIRPORTS.find(a=>a.code===to);
-    const fromFull=fromA?fromA.code+" - "+fromA.city+", "+fromA.country:from;
-    const toFull=toA?toA.code+" - "+toA.city+", "+toA.country:to;
-    await pool.query('INSERT INTO logistics (code,s_name,s_phone,s_email,s_addr,from_code,from_full,r_name,r_phone,r_email,r_addr,to_code,to_full,items,weight,pkg) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',[code,sName,sPhone,sEmail,sAddr,from,fromFull,rName,rPhone,rEmail,rAddr,to,toFull,items,weight,pkg]);
-    res.json({trackingUrl:'/logistics-track?code='+code});
-  }catch(e){console.error(e); res.status(500).json({error:e.message})}
-});
-
-app.get('/logistics-track', async (req,res)=>{
-  try{
-    const code=(req.query.code||'').toUpperCase().trim();
-    if(!code) return res.send('Invalid code');
-    const r=await pool.query('SELECT * FROM logistics WHERE code=$1',[code]);
-    if(!r.rows.length) return res.send('<h3 style="font-family:Arial;text-align:center;margin-top:40px">Cargo not found<br><a href="/logistics">Track another</a></h3>');
-    const d=r.rows[0]; let percent=25; const hrs=(Date.now()-new Date(d.created_at))/3600000;
-    if(hrs>2) percent=55; if(hrs>8) percent=75; if(hrs>20) percent=90; if(hrs>36) percent=100;
-    const steps=[
-      {t:'📦 Cargo Received at Origin', d:'Location: '+d.from_full+'<br>Sender: '+d.s_name+' ('+d.s_phone+')<br>'+new Date(d.created_at).toLocaleString(), done:true},
-      {t:'✈️ In Transit - Cargo Plane Departed', d:'Departed '+d.from_full+' → To '+d.to_code+'<br>Items: '+d.items+' | Weight: '+d.weight, done:percent>=55},
-      {t:'🛬 Arrived Destination Hub', d:'Hub: '+d.to_full, done:percent>=75},
-      {t:'🚚 Out for Delivery', d:'Courier to: '+d.r_name+' ('+d.r_phone+')<br>Address: '+d.r_addr, done:percent>=90},
-      {t:'✅ Delivered', d:'Delivered to '+d.r_name+' at '+d.r_addr, done:percent>=100}
-    ];
-    const safe = (s)=> (s||'').toString().replace(/"/g,'').replace(/'/g,'').substring(0,200);
-    res.send('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+code+' - SKYLINK</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\\/script><style>body{margin:0;font-family:Inter,Arial;background:#f1f5f9;display:flex;justify-content:center;padding:12px}.card{width:100%;max-width:620px;background:#fff;border-radius:20px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.08);border:1px solid #e2e8f0}.pill{background:#16a34a;color:#fff;padding:10px 18px;border-radius:20px;font-weight:900;display:inline-block}.bar{height:8px;background:#e2e8f0;border-radius:10px;overflow:hidden;margin:16px 0}.fill{height:100%;background:#16a34a;width:'+percent+'%;transition:.5s}.step{border-left:3px solid #e2e8f0;padding:10px 16px;margin:12px 0;border-radius:0 12px 12px 0;background:#f8fafc}.step.done{border-left-color:#16a34a;background:#f0fdf4}.t{font-weight:900;font-size:14px}.d{font-size:12px;color:#475569;margin-top:4px;line-height:1.5}.top{display:flex;gap:8px;justify-content:center;margin:12px 0;flex-wrap:wrap}.top a{font-weight:800;font-size:12px;border:1.5px solid #0f2e6d;padding:7px 14px;border-radius:20px;text-decoration:none;color:#0f2e6d}.btn{width:100%;padding:14px;border:none;border-radius:12px;font-weight:900;cursor:pointer;margin-top:10px;font-size:14px}.btn-green{background:#16a34a;color:#fff}.btn-dark{background:#0f2e6d;color:#fff}.btn-white{background:#fff;color:#0f2e6d;border:1.5px solid #0f2e6d}#qr{display:flex;justify-content:center;margin:12px 0}</style></head><body><div class="card"><div style="text-align:center"><div class="pill">'+code+'</div><div class="top"><a href="/">🏠 Home</a><a href="/logistics">📦 New</a><a href="/flights">✈️ Flights</a></div></div><div style="font-size:13px;background:#f8fafc;border:1px solid #e2e8f0;padding:14px;border-radius:12px;line-height:1.8"><b>Items:</b> '+safe(d.items)+'<br><b>Weight:</b> '+safe(d.weight)+'<br><b>Note:</b> '+safe(d.pkg)+'<br><br><b>Sender:</b> '+safe(d.s_name)+'<br>Phone: '+safe(d.s_phone)+'<br>Email: '+safe(d.s_email)+'<br>Address: '+safe(d.s_addr)+'<br>Origin: '+safe(d.from_full)+'<br><br><b>Receiver:</b> '+safe(d.r_name)+'<br>Phone: '+safe(d.r_phone)+'<br>Email: '+safe(d.r_email)+'<br>Delivery: '+safe(d.r_addr)+'<br>Destination: '+safe(d.to_full)+'</div><div class="bar"><div class="fill"></div></div><div style="font-size:12px;font-weight:800;color:#16a34a;text-align:center">'+percent+'% - '+(percent<100?'In Transit':'Delivered')+'</div>'+steps.map(s=>'<div class="step '+(s.done?'done':'')+'"><div class="t">'+(s.done?'✅':'⏳')+' '+s.t+'</div><div class="d">'+s.d+'</div></div>').join('')+'<div id="qr"></div><button class="btn btn-green" onclick="downloadHD()">📥 Download Receipt HD</button><button class="btn btn-dark" onclick="copyLink()">🔗 Copy Tracking Link</button><button class="btn btn-white" onclick="shareWA()">📱 Share WhatsApp</button><div id="msg" style="text-align:center;font-size:12px;color:#16a34a;font-weight:800;margin-top:8px;display:none"></div></div><script>var trackingLink=window.location.origin+"/logistics-track?code='+code+'";new QRCode(document.getElementById("qr"),{text:trackingLink,width:130,height:130});function copyLink(){navigator.clipboard.writeText(trackingLink).then(()=>{var m=document.getElementById("msg");m.style.display="block";m.innerText="✅ Tracking link copied";setTimeout(()=>m.style.display="none",3000)})}function shareWA(){var txt="📦 SKYLINK LOGISTICS Cargo%0A*Code:* '+code+'%0A*Items:* "+encodeURIComponent("'+safe(d.items)+'")+"%0A*From:* "+encodeURIComponent("'+safe(d.from_full)+'")+"%0A*To:* "+encodeURIComponent("'+safe(d.to_full)+'")+"%0A%0ATrack: "+encodeURIComponent(trackingLink);window.open("https://wa.me/?text="+txt,"_blank")}function downloadHD(){var c=document.createElement("canvas");c.width=700;c.height=900;var ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,700,900);ctx.fillStyle="#16a34a";ctx.fillRect(0,0,700,85);ctx.fillStyle="#fff";ctx.font="bold 22px Arial";ctx.textAlign="center";ctx.fillText("📦 SKYLINK LOGISTICS",350,36);ctx.font="bold 12px Arial";ctx.fillText("OFFICIAL CARGO RECEIPT - '+code+'",350,60);ctx.fillStyle="#000";ctx.textAlign="left";ctx.font="13px Arial";var y=115;var lines=["Tracking: '+code+'","Items: '+safe(d.items)+'","Weight: '+safe(d.weight)+'","Note: '+safe(d.pkg)+'","","SENDER: '+safe(d.s_name)+' - '+safe(d.s_phone)+'","Email: '+safe(d.s_email)+'","Address: '+safe(d.s_addr)+'","Origin: '+safe(d.from_full)+'","","RECEIVER: '+safe(d.r_name)+' - '+safe(d.r_phone)+'","Email: '+safe(d.r_email)+'","Delivery: '+safe(d.r_addr)+'","Destination: '+safe(d.to_full)+'","","Date: '+new Date().toLocaleString()+'","Status: '+percent+'%","Service: Cargo Plane + Delivery Van","","Track: "+trackingLink];lines.forEach(l=>{ctx.fillText(l,20,y);y+=22});ctx.strokeStyle="#16a34a";ctx.strokeRect(250,y+10,200,200);ctx.fillStyle="#16a34a";ctx.textAlign="center";ctx.font="bold 10px Arial";ctx.fillText("SCAN TO TRACK",350,y+100);var a=document.createElement("a");a.download="'+code+'-SKYLINK.png";a.href=c.toDataURL("image/png");a.click()}</script></body></html>');
-  }catch(e){res.status(500).send(e.message)}
 });
 app.post('/api/book', async (req,res)=>{
   const {name,email,from,to,depart,class:cls,paystackRef}=req.body;
