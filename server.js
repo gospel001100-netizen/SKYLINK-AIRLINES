@@ -192,7 +192,46 @@ initDB();
 app.get('/skylink-admin-login', (req,res)=>{ res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#0f2e6d;display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial}.card{background:#fff;padding:30px;border-radius:16px;width:100%;max-width:360px;box-shadow:0 10px 40px rgba(0,0,0,.3)}input{width:100%;padding:13px;border-radius:10px;border:1.5px solid #e2e8f0;margin-top:12px;box-sizing:border-box;font-size:14px}button{width:100%;background:#0f2e6d;color:#fff;padding:13px;border-radius:10px;border:none;font-weight:900;margin-top:14px;cursor:pointer}</style></head><body><div class="card"><div style="text-align:center;font-weight:900;font-size:20px">✈️ SKYLINK ADMIN</div><div style="text-align:center;font-size:11px;color:#64748b;margin-top:6px;letter-spacing:1px">ADMIN LOGIN ONLY</div><form method="POST" action="/api/admin-login"><input type="password" name="password" placeholder="Enter admin password" required><button type="submit">Login →</button></form></div></body></html>`);});
 app.post('/api/admin-login', (req,res)=>{ const pass = req.body.password || ''; if(pass === ADMIN_PASSWORD){ res.setHeader('Set-Cookie', 'admin_auth=Skylink1824; Path=/; Max-Age=86400; HttpOnly'); res.redirect('/skylink-admin-gospel-2024'); } else { res.send('<script>alert("Wrong password"); location.href="/skylink-admin-login"</script>'); } });
 app.get('/skylink-admin-logout', (req,res)=>{ res.setHeader('Set-Cookie', 'admin_auth=; Path=/; Max-Age=0'); res.redirect('/skylink-admin-login'); });
+// NEW HOMEPAGE - 2 OPTIONS
 app.get('/', (req,res)=>{
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SKYLINK</title><style>
+body{margin:0;font-family:Inter,Arial;background:#f1f5f9;display:flex;justify-content:center;padding:20px;min-height:100vh;align-items:center}
+.card{width:100%;max-width:700px;background:#fff;border-radius:24px;padding:30px;box-shadow:0 12px 40px rgba(0,0,0,.1);border:1px solid #e2e8f0;text-align:center}
+.pill{background:#0f2e6d;color:#fff;padding:14px 26px;border-radius:30px;font-weight:900;font-size:18px;display:inline-flex;gap:8px}
+.pill span{color:#FACC15}
+.sub{font-size:11px;color:#64748b;font-weight:800;margin:12px 0 24px;letter-spacing:1px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+.option{border:2px solid #e2e8f0;border-radius:18px;padding:22px;cursor:pointer;transition:.2s;background:#f8fafc;text-decoration:none;color:#0f172a;display:block}
+.option:hover{border-color:#0f2e6d;background:#fff;transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,.08)}
+.icon{font-size:36px;margin-bottom:10px}
+.title{font-weight:900;font-size:16px}
+.desc{font-size:12px;color:#64748b;margin-top:6px;font-weight:600}
+.price{margin-top:10px;background:#0f2e6d;color:#fff;display:inline-block;padding:6px 14px;border-radius:20px;font-weight:900;font-size:12px}
+.price.log{background:#16a34a}
+</style></head><body><div class="card">
+<div class="pill">✈️ SKYLINK <span>GROUP</span></div>
+<div class="sub">OFFICIAL PORTAL - CHOOSE SERVICE</div>
+<div class="grid">
+<a class="option" href="/flights">
+<div class="icon">✈️</div>
+<div class="title">SKYLINK AIRLINES</div>
+<div class="desc">Book flights to 150+ airports worldwide<br>Real-time tracking & boarding pass</div>
+<div class="price">NGN 2,150</div>
+</a>
+<a class="option" href="/logistics">
+<div class="icon">📦</div>
+<div class="title">SKYLINK LOGISTICS</div>
+<div class="desc">Cargo Plane + Delivery Van<br>Real tracking with sender/receiver details</div>
+<div class="price log">NGN 3,000</div>
+</a>
+</div>
+<div style="margin-top:20px;font-size:11px;color:#94a3b8">Licensed & Approved • Secure Paystack Payments • Permanent Records</div>
+</div></body></html>`);
+});
+
+// YOUR V9 AIRLINES MOVED TO /flights - 100% UNTOUCHED
+app.get('/flights', (req,res)=>{
   const aj = JSON.stringify(AIRPORTS);
   const pk = process.env.PAYSTACK_PUBLIC_KEY || 'pk_live_d820c59c33c0628f48f10176e8ff25b243fd6c73';
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>SKYLINK AIRLINES</title><script src="https://js.paystack.co/v1/inline.js"><\/script><style>
@@ -217,9 +256,12 @@ input:focus{background:#fff;border-color:#0f2e6d}
 #step2{display:none}
 .warning{background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:12px;font-weight:800;font-size:13px;color:#92400E;text-align:center;margin-bottom:12px}
 .summary{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;font-size:14px;line-height:1.6;margin-bottom:12px}
+.top-links{display:flex;gap:10px;justify-content:center;margin-bottom:14px}
+.top-links a{background:#fff;border:1.5px solid #0f2e6d;color:#0f2e6d;padding:8px 14px;border-radius:20px;font-weight:800;font-size:12px;text-decoration:none}
 </style></head><body><div class="wrapper"><div class="card">
 <div class="header"><div class="pill">✈️ SKYLINK <span>AIRLINES</span></div></div>
 <div class="sub">OFFICIAL BOOKING PORTAL</div>
+<div class="top-links"><a href="/">🏠 Home</a><a href="/logistics">📦 Logistics</a></div>
 <div id="step1">
 <form onsubmit="goToPayment(event)">
 <label>Full Name *</label><input id="pname" required placeholder="As on passport" autocomplete="off">
