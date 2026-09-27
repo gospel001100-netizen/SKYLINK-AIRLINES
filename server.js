@@ -3,6 +3,11 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const { Pool } = require('pg');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { require: true }
+});
 let QRCode = null; try{ QRCode = require('qrcode'); }catch(e){}
 let mongoose = null; try{ mongoose = require('mongoose'); }catch(e){}
 let DateTime = null; try{ DateTime = require('luxon').DateTime; }catch(e){ console.log('luxon not installed - install luxon for real timezone'); }
