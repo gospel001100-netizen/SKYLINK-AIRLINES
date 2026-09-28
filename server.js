@@ -270,7 +270,7 @@ input:focus{background:#fff;border-color:#0f2e6d}
 <div id="step1">
 <form onsubmit="goToPayment(event)">
 <label>Full Name *</label><input id="pname" required placeholder="As on passport" autocomplete="off">
-<label>Email *</label><input id="email" type="email" required placeholder="boarding pass will be sent here" autocomplete="off">
+<label>Email *</label><input id="email" type="email" required placeholder="" autocomplete="off">
 <label>From * <span class="badge">150+ COUNTRIES</span></label><div class="rel"><input id="from" autocomplete="off" oninput="autoSuggest('from')" placeholder="e.g. SAH - Sanaa, Yemen" required><div id="from-suggest" class="suggest"></div></div>
 <label>To *</label><div class="rel"><input id="to" autocomplete="off" oninput="autoSuggest('to')" placeholder="e.g. LOS - Lagos" required><div id="to-suggest" class="suggest"></div></div>
 <label>Departure Date & Time *</label><input type="datetime-local" id="depart" required>
