@@ -380,7 +380,7 @@ app.post('/api/logistics/book', async (req,res)=>{
   try{
     const {sName,sPhone,sEmail,sAddr,from,rName,rPhone,rEmail,rAddr,to,items,weight,pkg,shipDate,paystackRef} = req.body;
     if(!sName||!from||!to||!rName||!items||!weight||!shipDate) return res.status(400).json({error:'Missing fields'});
-    if(!paystackRef) return res.status(400).json({error:'Payment required'});
+if(!paystackRef) return res.status(400).json({error:'Payment required'});
     const code='LOG-'+Math.random().toString(36).substring(2,8).toUpperCase();
     const fromA=findAirport(from); const toA=findAirport(to);
     const fromFull=fromA?`${fromA.code} - ${fromA.city}, ${fromA.country}`:from;
