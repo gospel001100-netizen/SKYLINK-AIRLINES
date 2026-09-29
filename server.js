@@ -18,7 +18,7 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, JSON.stringify({}), 'utf8');
 let bookings = new Map();
 let BookingModel = null;
-
+let logistics = new Map();
 async function initDB(){
   const uri = process.env.MONGODB_URI;
   if(uri && mongoose){
@@ -378,24 +378,29 @@ document.addEventListener('click',function(e){if(!e.target.closest('.rel'))docum
 
 app.post('/api/logistics/book', async (req,res)=>{
   try{
-    const {sName,sPhone,sEmail,sAddr,from,rName,rPhone,rEmail,rAddr,to,items,weight,pkg,shipDate}=req.body;
+    const {sName,sPhone,sEmail,sAddr,from,rName,rPhone,rEmail,rAddr,to,items,weight,pkg,shipDate,paystackRef} = req.body;
     if(!sName||!from||!to||!rName||!items||!weight||!shipDate) return res.status(400).json({error:'Missing fields'});
+    if(!paystackRef) return res.status(400).json({error:'Payment required'});
     const code='LOG-'+Math.random().toString(36).substring(2,8).toUpperCase();
-    const fromA=AIRPORTS.find(a=>a.code===from); const toA=AIRPORTS.find(a=>a.code===to);
-    const fromFull=fromA?fromA.code+" - "+fromA.city+", "+fromA.country:from;
-    const toFull=toA?toA.code+" - "+toA.city+", "+toA.country:to;
-    await pool.query('INSERT INTO logistics (code,s_name,s_phone,s_email,s_addr,from_code,from_full,r_name,r_phone,r_email,r_addr,to_code,to_full,items,weight,pkg,ship_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)',[code,sName,sPhone,sEmail,sAddr,from,fromFull,rName,rPhone,rEmail,rAddr,to,toFull,items,weight,pkg,shipDate]);
+    const fromA=findAirport(from); const toA=findAirport(to);
+    const fromFull=fromA?`${fromA.code} - ${fromA.city}, ${fromA.country}`:from;
+    const toFull=toA?`${toA.code} - ${toA.city}, ${toA.country}`:to;
+    const rec = {code, s_name:sName, s_phone:sPhone, s_email:sEmail, s_addr:sAddr, from_code:from, from_full:fromFull, r_name:rName, r_phone:rPhone, r_email:rEmail, r_addr:rAddr, to_code:to, to_full:toFull, items, weight, pkg, ship_date:shipDate, paystackRef, created_at:new Date().toISOString()};
+    logistics.set(code, rec);
+    bookings.set(code, rec);
+    try{ const o={}; bookings.forEach((v,k)=>{ o[k]=v }); logistics.forEach((v,k)=>{ o[k]=v }); fs.writeFileSync(DATA_FILE, JSON.stringify(o,null,2),'utf8'); }catch(e){}
+    if(BookingModel){ try{ await BookingModel.findOneAndUpdate({tracking: code}, rec, {upsert:true}); }catch(e){} }
     res.json({code, receiptUrl:'/logistics-receipt?code='+code, trackingUrl:'/logistics-track?code='+code});
-  }catch(e){console.error(e); res.status(500).json({error:e.message})}
+  }catch(e){ res.status(500).json({error:e.message}) }
 });
 
 app.get('/logistics-receipt', async (req,res)=>{
   try{
     const code=(req.query.code||'').toUpperCase().trim();
     if(!code) return res.status(200).send('<h3 style="font-family:Arial;text-align:center;margin-top:40px">Invalid code<br><a href="/logistics">Create new</a></h3>');
-    const r=await pool.query('SELECT * FROM logistics WHERE code=$1',[code]);
-    if(!r.rows.length) return res.status(200).send('<h3 style="font-family:Arial;text-align:center;margin-top:40px">Receipt not found for '+code+'<br><a href="/logistics">Create new</a></h3>');
-    const d=r.rows[0];
+        let d = logistics.get(code) || bookings.get(code);
+    if(!d && BookingModel){ try{ const doc=await BookingModel.findOne({tracking:code}); if(doc) d=doc.toObject(); }catch(e){} }
+    if(!d){ return res.status(200).send(`<h3 style="font-family:Arial;text-align:center;margin-top:40px">Receipt not found for ${code}<br><a href="/logistics">Create new</a></h3>`); }
     let percent=25; const hrs=(Date.now()-new Date(d.created_at))/3600000;
     if(hrs>2) percent=55; if(hrs>8) percent=75; if(hrs>20) percent=90; if(hrs>36) percent=100;
     const esc = (s)=> (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,300);
@@ -417,19 +422,20 @@ app.get('/logistics-track', async (req,res)=>{
   try{
     const code=(req.query.code||'').toUpperCase().trim();
     if(!code) return res.send('Invalid code');
-    const r=await pool.query('SELECT * FROM logistics WHERE code=$1',[code]);
-    if(!r.rows.length) return res.send('<h3 style="font-family:Arial;text-align:center;margin-top:40px">Cargo not found<br><a href="/logistics">Track another</a></h3>');
-    const d=r.rows[0]; let percent=25; const hrs=(Date.now()-new Date(d.created_at))/3600000;
+    let d = logistics.get(code) || bookings.get(code);
+    if(!d && BookingModel){ try{ const doc=await BookingModel.findOne({tracking:code}); if(doc) d=doc.toObject(); }catch(e){} }
+    if(!d){ return res.send(`<h3 style="font-family:Arial;text-align:center;margin-top:40px">Cargo ${code} not found<br><a href="/logistics">Track another</a></h3>`); }
+    let percent=25; const hrs=(Date.now()-new Date(d.created_at||d.createdAt))/3600000;
     if(hrs>2) percent=55; if(hrs>8) percent=75; if(hrs>20) percent=90; if(hrs>36) percent=100;
     const esc = (s)=> (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,300);
     const steps=[
-      {t:'📦 Cargo Received at Origin', d:`Location: ${esc(d.from_full)}<br>Sender: ${esc(d.s_name)} (${esc(d.s_phone)})<br>${new Date(d.created_at).toLocaleString()}`, done:true},
-      {t:'✈️ In Transit - Cargo Plane Departed', d:`Departed ${esc(d.from_full)} → To ${esc(d.to_code)}<br>Items: ${esc(d.items)} | Weight: ${esc(d.weight)}`, done:percent>=55},
-      {t:'🛬 Arrived Destination Hub', d:`Hub: ${esc(d.to_full)}`, done:percent>=75},
+      {t:'📦 Cargo Received at Origin', d:`Location: ${esc(d.from_full||d.fromFull)}<br>Sender: ${esc(d.s_name||d.name)} (${esc(d.s_phone)})<br>${new Date(d.created_at||d.createdAt).toLocaleString()}`, done:true},
+      {t:'✈️ In Transit - Cargo Plane Departed', d:`Departed ${esc(d.from_full||d.fromFull)} → To ${esc(d.to_code||d.to)}<br>Items: ${esc(d.items)} | Weight: ${esc(d.weight)}`, done:percent>=55},
+      {t:'🛬 Arrived Destination Hub', d:`Hub: ${esc(d.to_full||d.toFull)}`, done:percent>=75},
       {t:'🚚 Out for Delivery', d:`Courier to: ${esc(d.r_name)} (${esc(d.r_phone)})<br>Address: ${esc(d.r_addr)}`, done:percent>=90},
       {t:'✅ Delivered', d:`Delivered to ${esc(d.r_name)} at ${esc(d.r_addr)}`, done:percent>=100}
     ];
-    res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${code} - SKYLINK</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>body{margin:0;font-family:Inter,Arial;background:#f1f5f9;display:flex;justify-content:center;padding:12px}.card{width:100%;max-width:620px;background:#fff;border-radius:20px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.08);border:1px solid #e2e8f0}.pill{background:#16a34a;color:#fff;padding:10px 18px;border-radius:20px;font-weight:900;display:inline-block}.bar{height:8px;background:#e2e8f0;border-radius:10px;overflow:hidden;margin:16px 0}.fill{height:100%;background:#16a34a;width:${percent}%;transition:.5s}.step{border-left:3px solid #e2e8f0;padding:10px 16px;margin:12px 0;border-radius:0 12px 12px 0;background:#f8fafc}.step.done{border-left-color:#16a34a;background:#f0fdf4}.t{font-weight:900;font-size:14px}.d{font-size:12px;color:#475569;margin-top:4px;line-height:1.5}.top{display:flex;gap:8px;justify-content:center;margin:12px 0;flex-wrap:wrap}.top a{font-weight:800;font-size:12px;border:1.5px solid #0f2e6d;padding:7px 14px;border-radius:20px;text-decoration:none;color:#0f2e6d}#qr{display:flex;justify-content:center;margin:12px 0}</style></head><body><div class="card"><div style="text-align:center"><div class="pill">${code}</div><div class="top"><a href="/">🏠 Home</a><a href="/logistics">📦 New</a><a href="/flights">✈️ Flights</a></div></div><div style="font-size:13px;background:#f8fafc;border:1px solid #e2e8f0;padding:14px;border-radius:12px;line-height:1.8"><b>Items:</b> ${esc(d.items)}<br><b>Weight:</b> ${esc(d.weight)}<br><b>Shipping Date:</b> ${esc(d.ship_date)}<br><b>Note:</b> ${esc(d.pkg)}<br><br><b>Sender:</b> ${esc(d.s_name)}<br>Phone: ${esc(d.s_phone)}<br>Email: ${esc(d.s_email)}<br>Address: ${esc(d.s_addr)}<br>Origin: ${esc(d.from_full)}<br><br><b>Receiver:</b> ${esc(d.r_name)}<br>Phone: ${esc(d.r_phone)}<br>Email: ${esc(d.r_email)}<br>Delivery: ${esc(d.r_addr)}<br>Destination: ${esc(d.to_full)}</div><div class="bar"><div class="fill"></div></div><div style="font-size:12px;font-weight:800;color:#16a34a;text-align:center">${percent}% - ${percent<100?'In Transit':'Delivered'}</div>${steps.map(s=>`<div class="step ${s.done?'done':''}"><div class="t">${s.done?'✅':'⏳'} ${s.t}</div><div class="d">${s.d}</div></div>`).join('')}<div id="qr"></div><div style="text-align:center;margin-top:14px;font-size:12px;color:#64748b">QR code is scannable - verifies on skylinklogistics.com</div></div><script>var trackingLink=window.location.origin.replace("www.","")+"/logistics-track?code=${code}"; setTimeout(function(){ try{ new QRCode(document.getElementById("qr"),{text:trackingLink,width:120,height:120,correctLevel:QRCode.CorrectLevel.H}); }catch(e){} },500);<\/script></body></html>`);
+    res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${code} - SKYLINK</title><style>body{margin:0;font-family:Arial;background:#f1f5f9;display:flex;justify-content:center;padding:12px}.card{width:100%;max-width:620px;background:#fff;border-radius:20px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.08);border:1px solid #e2e8f0}.bar{height:8px;background:#e2e8f0;border-radius:10px;overflow:hidden;margin:16px 0}.fill{height:100%;background:#16a34a;width:${percent}%}</style></head><body><div class="card"><h2 style="text-align:center">${code} - ${percent}%</h2><div class="bar"><div class="fill"></div></div>${steps.map(s=>`<div style="border-left:3px solid ${s.done?'#16a34a':'#e2e8f0'};padding:10px 16px;margin:12px 0;background:${s.done?'#f0fdf4':'#f8fafc'};border-radius:0 12px 12px 0"><div style="font-weight:900">${s.done?'✅':'⏳'} ${s.t}</div><div style="font-size:12px;color:#475569;margin-top:4px">${s.d}</div></div>`).join('')}<div style="text-align:center;margin-top:14px"><a href="/logistics-receipt?code=${code}" style="font-weight:800;color:#0f2e6d">View Receipt</a> | <a href="/">Home</a></div></div></body></html>`);
   }catch(e){ res.status(500).send(e.message) }
 });
 app.post('/api/book', async (req,res)=>{
