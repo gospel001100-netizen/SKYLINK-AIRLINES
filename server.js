@@ -549,7 +549,16 @@ app.get('/logistics-track', async (req,res)=>{
    const fromLabel="${fromLabelSafe}",toLabel="${toLabelSafe}";
    const map=L.map('map').setView([${(fromReal.lat+toReal.lat)/2},${(fromReal.lon+toReal.lon)/2}],3);
    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap - Real Countries'}).addTo(map);
-   const route=L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:'#ffcc00',weight:4,dashArray:'8,10'}).addTo(map);
+   // REAL NORTHERN ROUTE - Avoid Africa, pass via Europe
+const northernRoute = [
+  [fromLat,fromLon],
+  [24.0,46.0],
+  [32.0,36.0],
+  [41.0,28.9],
+  [51.4,-0.4],
+  [toLat,toLon]
+];
+const route=L.polyline(northernRoute,{color:'#ffcc00',weight:4,dashArray:'8,10'}).addTo(map);
    L.marker([fromLat,fromLon]).addTo(map).bindPopup(fromLabel).openPopup();
    L.marker([toLat,toLon]).addTo(map).bindPopup(toLabel);
    const planeIcon=L.divIcon({html:'<div style="font-size:28px">✈️</div>',iconSize:[28,28],iconAnchor:[14,14]}); const plane=L.marker([fromLat,fromLon],{icon:planeIcon}).addTo(map);
