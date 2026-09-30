@@ -126,6 +126,14 @@ const AIRPORTS = [
   {code:"PVG", city:"Shanghai", country:"China", name:"Pudong", tz:"Asia/Shanghai", lat:31.143, lon:121.805},
   {code:"SYD", city:"Sydney", country:"Australia", name:"Sydney", tz:"Australia/Sydney", lat:-33.939, lon:151.175},
   {code:"AKL", city:"Auckland", country:"New Zealand", name:"Auckland Intl", tz:"Pacific/Auckland", lat:-37.008, lon:174.791},
+  {code:"SVO", city:"Moscow", country:"Russia", name:"Sheremetyevo Intl", tz:"Europe/Moscow", lat:55.972642, lng:37.414589},
+{code:"DME", city:"Moscow", country:"Russia", name:"Domodedovo Intl", tz:"Europe/Moscow", lat:55.4088, lng:37.9061},
+{code:"LED", city:"St Petersburg", country:"Russia", name:"Pulkovo Intl", tz:"Europe/Moscow", lat:59.8003, lng:30.2625},
+{code:"RUSSIA", city:"Moscow", country:"Russia", name:"RUSSIA - Moscow", tz:"Europe/Moscow", lat:55.972642, lng:37.414589},
+{code:"DAM", city:"Damascus", country:"Syria", name:"Damascus Intl", tz:"Asia/Damascus", lat:33.4106, lng:36.5156},
+{code:"ALP", city:"Aleppo", country:"Syria", name:"Aleppo Intl", tz:"Asia/Damascus", lat:36.1807, lng:37.2243},
+{code:"SYRIA", city:"Damascus", country:"Syria", name:"SYRIA - Damascus", tz:"Asia/Damascus", lat:33.4106, lng:36.5156},
+{code:"ORD", city:"Chicago", country:"USA", name:"O'Hare Intl", tz:"America/Chicago", lat:41.974162, lng:-87.907321},
 ];
 function haversine(lat1, lon1, lat2, lon2){ const R=6371; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180; const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(a)); }
 function getFlightDetails(from, to){
