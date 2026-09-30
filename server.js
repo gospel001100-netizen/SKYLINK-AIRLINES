@@ -395,48 +395,106 @@ if(!paystackRef) return res.status(400).json({error:'Payment required'});
 });
 
 app.get('/logistics-receipt', async (req,res)=>{
-  try{
-    const code=(req.query.code||'').toUpperCase().trim();
-    if(!code) return res.status(200).send('<h3 style="font-family:Arial;text-align:center;margin-top:40px">Invalid code<br><a href="/logistics">Create new</a></h3>');
-        let d = logistics.get(code) || bookings.get(code);
-    if(!d && BookingModel){ try{ const doc=await BookingModel.findOne({tracking:code}); if(doc) d=doc.toObject(); }catch(e){} }
-    if(!d){ return res.status(200).send(`<h3 style="font-family:Arial;text-align:center;margin-top:40px">Receipt not found for ${code}<br><a href="/logistics">Create new</a></h3>`); }
-    let percent=25; const hrs=(Date.now()-new Date(d.created_at))/3600000;
-    if(hrs>2) percent=55; if(hrs>8) percent=75; if(hrs>20) percent=90; if(hrs>36) percent=100;
-    const esc = (s)=> (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,300);
-    const dataJson = JSON.stringify(d).replace(/</g,'\\u003c');
-    res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${code} - Receipt</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>body{margin:0;font-family:Inter,Arial;background:#f1f5f9;display:flex;justify-content:center;padding:12px}.card{width:100%;max-width:620px;background:#fff;border-radius:20px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.08);border:1px solid #e2e8f0}.pill{background:#16a34a;color:#fff;padding:10px 18px;border-radius:20px;font-weight:900;display:inline-block}.top{display:flex;gap:8px;justify-content:center;margin:12px 0;flex-wrap:wrap}.top a{font-weight:800;font-size:12px;border:1.5px solid #0f2e6d;padding:7px 14px;border-radius:20px;text-decoration:none;color:#0f2e6d}.btn{width:100%;padding:14px;border:none;border-radius:12px;font-weight:900;cursor:pointer;margin-top:10px;font-size:14px}.btn-green{background:#16a34a;color:#fff}.btn-dark{background:#0f2e6d;color:#fff}.btn-white{background:#fff;color:#0f2e6d;border:1.5px solid #0f2e6d}#qr{display:flex;justify-content:center;margin:12px 0}</style></head><body><div class="card"><div style="text-align:center"><div class="pill">${code} - RECEIPT GENERATED ✅</div><div class="top"><a href="/">🏠 Home</a><a href="/logistics">📦 New</a><a href="/flights">✈️ Flights</a></div></div><div style="font-size:13px;background:#f0fdf4;border:1px solid #bbf7d0;padding:14px;border-radius:12px;line-height:1.8"><b>Items:</b> ${esc(d.items)}<br><b>Weight:</b> ${esc(d.weight)}<br><b>Shipping Date:</b> ${esc(d.ship_date)}<br><b>Note:</b> ${esc(d.pkg)}<br><br><b>Sender:</b> ${esc(d.s_name)}<br>Phone: ${esc(d.s_phone)}<br>Email: ${esc(d.s_email)}<br>Address: ${esc(d.s_addr)}<br>Origin: ${esc(d.from_full)}<br><br><b>Receiver:</b> ${esc(d.r_name)}<br>Phone: ${esc(d.r_phone)}<br>Email: ${esc(d.r_email)}<br>Delivery: ${esc(d.r_addr)}<br>Destination: ${esc(d.to_full)}</div><div id="qr"></div><button class="btn btn-green" onclick="downloadHD()">📥 Download Receipt</button><button class="btn btn-dark" onclick="copyLink()">🔗 Copy Tracking Link</button><button class="btn btn-white" onclick="shareWA()">📱 Share WhatsApp</button><div style="text-align:center;margin-top:12px"><a href="/logistics-track?code=${code}" style="font-size:13px;font-weight:800;color:#0f2e6d">→ Track Live</a></div><div id="msg" style="text-align:center;font-size:12px;color:#16a34a;font-weight:800;margin-top:8px;display:none"></div></div><script>
-const DATA = ${dataJson};
-const CODE = "${code}";
-var trackingLink = window.location.origin.replace("www.","") + "/logistics-track?code=" + CODE;
-function initQR(){ try{ if(window.QRCode){ new QRCode(document.getElementById("qr"),{text:trackingLink,width:160,height:160,correctLevel:QRCode.CorrectLevel.H}); } }catch(e){} }
-setTimeout(initQR,500);
-function copyLink(){ navigator.clipboard.writeText(trackingLink).then(()=>{ var m=document.getElementById("msg"); m.style.display="block"; m.innerText="✅ Tracking link copied"; setTimeout(()=>m.style.display="none",3000); }); }
-function shareWA(){ var txt = "📦 SKYLINK LOGISTICS Cargo%0A*Code:* "+CODE+"%0A*Items:* "+encodeURIComponent(DATA.items||"")+"%0A*From:* "+encodeURIComponent(DATA.from_full||"")+"%0A*To:* "+encodeURIComponent(DATA.to_full||"")+"%0A%0ATrack: "+encodeURIComponent(trackingLink); window.open("https://wa.me/?text="+txt,"_blank"); }
-function downloadHD(){ try{ var qrCanvas=document.querySelector("#qr canvas"); var c=document.createElement("canvas"); c.width=750; c.height=950; var ctx=c.getContext("2d"); ctx.fillStyle="#fff"; ctx.fillRect(0,0,750,950); ctx.fillStyle="#16a34a"; ctx.fillRect(0,0,750,85); ctx.fillStyle="#fff"; ctx.font="bold 24px Arial"; ctx.textAlign="center"; ctx.fillText("📦 SKYLINK LOGISTICS",375,38); ctx.font="bold 12px Arial"; ctx.fillText("OFFICIAL CARGO RECEIPT - "+CODE,375,62); ctx.fillStyle="#000"; ctx.textAlign="left"; ctx.font="13px Arial"; var y=110; var lines=["Tracking: "+CODE,"Items: "+(DATA.items||""),"Weight: "+(DATA.weight||""),"Shipping Date: "+(DATA.ship_date||""),"Note: "+(DATA.pkg||""),"","SENDER: "+(DATA.s_name||"")+" - "+(DATA.s_phone||""),"Email: "+(DATA.s_email||""),"Address: "+(DATA.s_addr||""),"Origin: "+(DATA.from_full||""),"","RECEIVER: "+(DATA.r_name||"")+" - "+(DATA.r_phone||""),"Email: "+(DATA.r_email||""),"Delivery: "+(DATA.r_addr||""),"Destination: "+(DATA.to_full||""),"","Date: "+new Date().toLocaleString(),"Status: ${percent}%","Service: Cargo Plane + Delivery Van","","Track: "+trackingLink]; lines.forEach(l=>{ ctx.fillText(l.substring(0,85),20,y); y+=22; }); var sigY=y+15; ctx.font="11px Arial"; ctx.fillStyle="#666"; ctx.fillText("Sender Signature:",20,sigY); ctx.strokeStyle="#0a3cc7"; ctx.lineWidth=1.8; ctx.beginPath(); ctx.moveTo(20,sigY+18); var rx=Math.random(); ctx.bezierCurveTo(50+rx*20,sigY-5+Math.random()*15,90+rx*30,sigY+30+Math.random()*10,160,sigY+15+Math.random()*10); ctx.bezierCurveTo(180,sigY+5,200,sigY+25,240,sigY+10); ctx.stroke(); ctx.font="9px Arial"; ctx.fillStyle="#888"; ctx.fillText("Signed on payment",20,sigY+38); if(qrCanvas){ ctx.drawImage(qrCanvas,260,sigY+50,200,200); ctx.font="bold 10px Arial"; ctx.fillStyle="#16a34a"; ctx.textAlign="center"; ctx.fillText("SCAN TO TRACK - "+CODE,360,sigY+265); } var a=document.createElement("a"); a.download=CODE+"-SKYLINK-RECEIPT.png"; a.href=c.toDataURL("image/png"); a.click(); }catch(e){ alert("Download failed: "+e.message); } }
-<\/script></body></html>`);
-  }catch(e){ console.error(e); res.status(500).send('<h3>Server error: '+e.message+'</h3><a href="/logistics">Back</a>'); }
+ try{
+  const code=(req.query.code||'').toUpperCase().trim();
+  if(!code) return res.status(200).send(`<h3 style="font-family:Arial">Invalid Code</h3>`);
+  let d = logistics.get(code) || bookings.get(code);
+  if(!d && BookingModel){ try{ const doc=await BookingModel.findOne({$or:[{code},{tracking:code}]}).lean(); if(doc) d=doc; }catch(e){} }
+  if(!d) return res.status(200).send(`<h3 style="font-family:Arial">Not Found - ${code}</h3>`);
+
+  let percent=25; const hrs=(Date.now()-new Date(d.created_at).getTime())/3600000;
+  if(hrs>2) percent=55; if(hrs>20) percent=75; if(hrs>48) percent=100;
+  const esc = (s)=> (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const dataJson = JSON.stringify(d).replace(/</g,'\\u003c');
+  const DATA = `${dataJson}`;
+  const CODE = `${code}`;
+  // Use SHIPPING DATE, not today
+  const shipDateStr = d.shipDate || d.s_date || d.shippingDate || '';
+  
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SKYLINK OFFICIAL RECEIPT - ${CODE}</title>
+  <style>
+   body{font-family:Arial,Helvetica,sans-serif;background:#f2f4f8;margin:0;padding:20px;color:#1a1a1a}
+   .page{max-width:800px;margin:0 auto;background:#fff;border:1px solid #d0d7e3;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+   .header{background:#0a2a5e;color:#fff;padding:18px 28px;display:flex;justify-content:space-between;align-items:center;border-bottom:4px solid #ffcc00}
+   .header h1{margin:0;font-size:22px;letter-spacing:1px}.header p{margin:4px 0 0;font-size:12px;opacity:.9}
+   .content{padding:28px}.row{display:flex;justify-content:space-between;gap:20px;margin-bottom:18px}
+   .col{flex:1}.label{font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
+   .value{font-size:14px;font-weight:600;color:#111827}.hr{border:none;border-top:1px dashed #d1d5db;margin:18px 0}
+   .status{padding:10px 14px;background:#eef6ff;border-left:4px solid #0a2a5e;font-weight:700}
+   .sign-area{margin-top:30px;display:flex;justify-content:space-between;align-items:end}
+   .sign-box{border-top:2px solid #111;padding-top:8px;min-width:220px}
+   .sign-blue{font-family:'Brush Script MT',cursive;font-size:28px;color:#0033cc;font-style:italic;transform:rotate(-2deg)}
+   .qr{ text-align:center; border-top:1px solid #eee; padding-top:18px; margin-top:18px}
+   .btns{display:flex;gap:10px;margin-top:18px}
+   .btn{padding:10px 18px;border-radius:6px;border:none;cursor:pointer;font-weight:700}
+   .btn-primary{background:#0a2a5e;color:#fff}.btn-gold{background:#ffcc00;color:#0a2a5e}
+   @media print{.btns{display:none} body{background:#fff;padding:0}}
+  </style></head><body>
+  <div class="page">
+   <div class="header"><div><h1>✈️ SKYLINK LOGISTICS</h1><p>OFFICIAL CARGO RECEIPT | www.skylinkairlines.com.ng</p></div><div style="text-align:right"><div style="font-size:13px">AWB No</div><div style="font-size:18px;font-weight:900;letter-spacing:1px">${CODE}</div></div></div>
+   <div class="content">
+    <div class="row"><div class="col"><div class="label">Tracking Number</div><div class="value">${esc(d.code||CODE)}</div></div><div class="col"><div class="label">Shipping Date (Booked Date)</div><div class="value" style="color:#0a2a5e">${esc(shipDateStr)} (Origin Local Time)</div></div><div class="col"><div class="label">Booking Time (Yemen Time)</div><div class="value">${new Date(d.created_at).toLocaleString('en-GB',{timeZone:'Asia/Aden',hour12:true})}</div></div></div>
+    <div class="hr"></div>
+    <div class="row"><div class="col"><div class="label">Items / Description</div><div class="value">${esc(d.items||d.r_items||'')}</div><div style="margin-top:10px"><span class="label">Weight</span><div class="value">${esc(d.weight||'') }kg</div></div></div><div class="col"><div class="label">Service</div><div class="value">Express Cargo Plane + Last Mile Van</div><div style="margin-top:10px"><span class="label">Note</span><div class="value">${esc(d.note||'')}</div></div></div></div>
+    <div class="hr"></div>
+    <div class="row"><div class="col" style="background:#f8fafc;padding:12px;border-radius:6px"><div class="label">FROM - Shipper</div><div class="value">${esc(d.s_name||d.sender_name)} - ${esc(d.s_phone||'')}</div><div style="font-size:13px;margin-top:6px">Email: ${esc(d.s_email||'')}<br>Address: ${esc(d.s_address||d.s_addr||'')}<br><b>Origin: ${esc(d.fromFull||d.from||'')}</b></div></div><div class="col" style="background:#fffbeb;padding:12px;border-radius:6px;border:1px solid #fde68a"><div class="label">TO - Consignee</div><div class="value">${esc(d.r_name||d.receiver_name)} - ${esc(d.r_phone||'')}</div><div style="font-size:13px;margin-top:6px">Email: ${esc(d.r_email||'')}<br>Address: ${esc(d.r_address||d.r_addr||'')}<br><b>Destination: ${esc(d.toFull||d.to||'')}</b></div></div></div>
+    <div class="status">Status: ${percent}% - ${percent<55?'Cargo Received at Origin':percent<75?'In Transit':percent<100?'Arrived Hub':'Ready for Delivery'}</div>
+    <div style="margin-top:12px;font-size:12px">Track: <b>https://skylinkairlines.com.ng/logistics-track?code=${CODE}</b></div>
+    <div class="sign-area"><div><div class="label">Authorized Signature (Official Blue Ink)</div><div class="sign-blue">Skylink Logistics ™</div><div class="sign-box"><span style="font-size:11px;color:#6b7280">OFFICIAL BLUE SIGNATURE - SYSTEM VERIFIED</span><br><span style="font-size:12px;font-weight:700;color:#0a2a5e">Signed on Payment | ${esc(shipDateStr)}</span></div></div><div class="qr"><div id="qrcode"></div><div style="font-size:11px;margin-top:6px;font-weight:700;color:#0a2a5e">SCAN TO TRACK - ${CODE}</div></div></div>
+    <div class="btns"><button class="btn btn-primary" onclick="window.print()">Download HD PDF</button><button class="btn btn-gold" onclick="navigator.clipboard.writeText(window.location.href)">Copy Link</button><button class="btn btn-primary" onclick="window.location.href='/logistics-track?code=${CODE}'">Live Track Cargo</button></div>
+   </div>
+  </div>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+ <script>const DATA=${DATA};const CODE="${CODE}";var trackingLink=window.location.origin.replace("www.","")+"/logistics-track?code="+CODE;function initQR(){ try{ if(window.QRCode){ new QRCode(document.getElementById("qrcode"),{text:trackingLink,width:130,height:130}); } }catch(e){} } setTimeout(initQR,500);</script></body></html>`);
+ }catch(e){ res.status(500).send(e.message) }
 });
 
 app.get('/logistics-track', async (req,res)=>{
-  try{
-    const code=(req.query.code||'').toUpperCase().trim();
-    if(!code) return res.send('Invalid code');
-    let d = logistics.get(code) || bookings.get(code);
-    if(!d && BookingModel){ try{ const doc=await BookingModel.findOne({tracking:code}); if(doc) d=doc.toObject(); }catch(e){} }
-    if(!d){ return res.send(`<h3 style="font-family:Arial;text-align:center;margin-top:40px">Cargo ${code} not found<br><a href="/logistics">Track another</a></h3>`); }
-    let percent=25; const hrs=(Date.now()-new Date(d.created_at||d.createdAt))/3600000;
-    if(hrs>2) percent=55; if(hrs>8) percent=75; if(hrs>20) percent=90; if(hrs>36) percent=100;
-    const esc = (s)=> (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,300);
-    const steps=[
-      {t:'📦 Cargo Received at Origin', d:`Location: ${esc(d.from_full||d.fromFull)}<br>Sender: ${esc(d.s_name||d.name)} (${esc(d.s_phone)})<br>${new Date(d.created_at||d.createdAt).toLocaleString()}`, done:true},
-      {t:'✈️ In Transit - Cargo Plane Departed', d:`Departed ${esc(d.from_full||d.fromFull)} → To ${esc(d.to_code||d.to)}<br>Items: ${esc(d.items)} | Weight: ${esc(d.weight)}`, done:percent>=55},
-      {t:'🛬 Arrived Destination Hub', d:`Hub: ${esc(d.to_full||d.toFull)}`, done:percent>=75},
-      {t:'🚚 Out for Delivery', d:`Courier to: ${esc(d.r_name)} (${esc(d.r_phone)})<br>Address: ${esc(d.r_addr)}`, done:percent>=90},
-      {t:'✅ Delivered', d:`Delivered to ${esc(d.r_name)} at ${esc(d.r_addr)}`, done:percent>=100}
-    ];
-    res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${code} - SKYLINK</title><style>body{margin:0;font-family:Arial;background:#f1f5f9;display:flex;justify-content:center;padding:12px}.card{width:100%;max-width:620px;background:#fff;border-radius:20px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.08);border:1px solid #e2e8f0}.bar{height:8px;background:#e2e8f0;border-radius:10px;overflow:hidden;margin:16px 0}.fill{height:100%;background:#16a34a;width:${percent}%}</style></head><body><div class="card"><h2 style="text-align:center">${code} - ${percent}%</h2><div class="bar"><div class="fill"></div></div>${steps.map(s=>`<div style="border-left:3px solid ${s.done?'#16a34a':'#e2e8f0'};padding:10px 16px;margin:12px 0;background:${s.done?'#f0fdf4':'#f8fafc'};border-radius:0 12px 12px 0"><div style="font-weight:900">${s.done?'✅':'⏳'} ${s.t}</div><div style="font-size:12px;color:#475569;margin-top:4px">${s.d}</div></div>`).join('')}<div style="text-align:center;margin-top:14px"><a href="/logistics-receipt?code=${code}" style="font-weight:800;color:#0f2e6d">View Receipt</a> | <a href="/">Home</a></div></div></body></html>`);
-  }catch(e){ res.status(500).send(e.message) }
+ try{
+  const code=(req.query.code||'').toUpperCase().trim();
+  let d = logistics.get(code) || bookings.get(code);
+  if(!d && BookingModel){ try{ const doc=await BookingModel.findOne({$or:[{code},{tracking:code}]}).lean(); if(doc) d=doc; }catch(e){} }
+  if(!d) return res.status(200).send(`<h2 style="font-family:Arial;text-align:center;margin-top:60px">Tracking ${code} not found</h2>`);
+
+  const from = d.from || ''; const to = d.to || '';
+  const fromA = findAirport(from); const toA = findAirport(to);
+  const fromLat = fromA?fromA.lat:0; const fromLon = fromA?fromA.lon:0;
+  const toLat = toA?toA.lat:0; const toLon = toA?toA.lon:0;
+  const fromCity = fromA?`${fromA.code} - ${fromA.city}, ${fromA.country}`:from;
+  const toCity = toA?`${toA.code} - ${toA.city}, ${toA.country}`:to;
+  const departISO = d.shipDate ? new Date(d.shipDate).toISOString() : new Date(d.created_at).toISOString();
+  const arriveISO = new Date(new Date(departISO).getTime()+ (48*3600000)).toISOString();
+  const fromTZ = fromA && fromA.country==='Yemen' ? 'Asia/Aden' : 'UTC';
+
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Live Track ${code}</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>body{margin:0;font-family:Arial;background:#f3f5f9}#map{height:420px;width:100%}.card{max-width:900px;margin:-40px auto 0;background:#fff;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.12);padding:20px;position:relative;z-index:999}.step{display:flex;gap:12px;padding:14px;border-left:3px solid #e5e7eb;margin-left:10px}.step.done{border-color:#0a2a5e;background:#f0f6ff}.dot{width:28px;height:28px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-weight:900}.done .dot{background:#0a2a5e;color:#fff}.header2{background:#0a2a5e;color:#fff;padding:18px;text-align:center;border-bottom:4px solid #ffcc00}.timeBox{font-size:13px;color:#374151}</style></head><body>
+   <div class="header2"><h2 style="margin:0">${code} - LIVE CARGO TRACKING</h2><p style="margin:4px 0 0;font-size:12px">${fromCity} ✈️ ${toCity}</p></div><div id="map"></div>
+   <div class="card"><h3 style="margin-top:0;color:#0a2a5e">✈️ Real-Time Movement - Origin Time: ${fromCity.split('-')[0]||''}</h3><div id="liveInfo" class="timeBox" style="margin-bottom:14px"></div>
+   <div class="step done"><div class="dot">✓</div><div><b>📦 Cargo Received at Origin</b><div class="timeBox">Location: ${fromCity}<br>Sender: ${d.s_name} (${d.s_phone})<br>${new Date(d.created_at).toLocaleString('en-GB',{timeZone:fromTZ,timeZoneName:'short'})}</div></div></div>
+   <div class="step" id="st2"><div class="dot">✈️</div><div><b>In Transit - Cargo Plane Departed</b><div class="timeBox">Departed ${fromCity} → To ${toCity}<br>Items: ${d.items} | Weight: ${d.weight}kg</div></div></div>
+   <div class="step" id="st3"><div class="dot">🛬</div><div><b>Arrived Destination Hub</b><div class="timeBox">Hub: ${toCity}</div></div></div>
+   <div class="step" id="st4"><div class="dot">🚚</div><div><b>Out for Delivery</b><div class="timeBox">Courier to: ${d.r_name} (${d.r_phone})<br>Address: ${d.r_address||d.r_addr||''}</div></div></div>
+   <div class="step" id="st5"><div class="dot">✅</div><div><b>Delivered</b><div class="timeBox">Delivered to ${d.r_name} at ${d.r_address||''}</div></div></div>
+   </div>
+   <script>
+    const departISO="${departISO}";const arriveISO="${arriveISO}";const fromLat=${fromLat};const fromLon=${fromLon};const toLat=${toLat};const toLon=${toLon};const fromTZ="${fromTZ}";const b={from:"${fromCity}",to:"${toCity}"};
+    const departMs=new Date(departISO).getTime();const arriveMs=new Date(arriveISO).getTime();
+    const map=L.map('map').setView([(fromLat+toLat)/2,(fromLon+toLon)/2],2);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    const routeLine=L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:'#0a2a5e',weight:3,dashArray:'8,8'}).addTo(map);
+    L.marker([fromLat,fromLon]).addTo(map).bindPopup(b.from+' - Departed');L.marker([toLat,toLon]).addTo(map).bindPopup(b.to+' - Arrival');
+    const planeIcon=L.divIcon({html:'✈️',className:'',iconSize:[30,30]});const planeMarker=L.marker([fromLat,fromLon],{icon:planeIcon}).addTo(map);map.fitBounds(routeLine.getBounds(),{padding:[30,30]});
+    function updateLive(){const now=Date.now();const diff=now-departMs;const remain=arriveMs-now;const totalMs=arriveMs-departMs;
+     const statusEl=document.getElementById('liveInfo');let progress=0;
+     if(diff<=0){progress=0;statusEl.innerHTML='Status: <b>Scheduled</b> - Departure at '+new Date(departISO).toLocaleString('en-GB',{timeZone:fromTZ})+' (Origin Local Time)';}
+     else if(diff>=totalMs){progress=1;document.getElementById('st2').classList.add('done');document.getElementById('st3').classList.add('done');document.getElementById('st4').classList.add('done');document.getElementById('st5').classList.add('done');statusEl.innerHTML='Status: <b>Landed ✓</b> - Flight Completed at '+new Date(arriveISO).toLocaleString('en-GB',{timeZone:fromTZ})+' (Origin Time)';}
+     else{progress=Math.min(1,Math.max(0,diff/totalMs));if(diff>5*60000)document.getElementById('st2').classList.add('done');if(diff>15*60000)document.getElementById('st3').classList.add('done');if(diff>30*60000)document.getElementById('st4').classList.add('done');
+      const h=Math.floor(remain/3600000);const m=Math.floor((remain%3600000)/60000);const s=Math.floor((remain%60000)/1000);
+      statusEl.innerHTML='Status: <b>✈️ In Transit - Live Moving</b><br>Origin Local Time: '+new Date().toLocaleString('en-GB',{timeZone:fromTZ,hour12:true})+' | Remaining: '+h+'h '+m+'m '+s+'s';
+     }
+     const curLat=fromLat+(toLat-fromLat)*progress;const curLon=fromLon+(toLon-fromLon)*progress;planeMarker.setLatLng([curLat,curLon]);
+    }updateLive();setInterval(updateLive,1000);
+   </script></body></html>`);
+ }catch(e){ res.status(500).send(e.message) }
 });
 app.post('/api/book', async (req,res)=>{
   const {name,email,from,to,depart,class:cls,paystackRef}=req.body;
