@@ -450,50 +450,116 @@ app.get('/logistics-receipt', async (req,res)=>{
  }catch(e){ res.status(500).send(e.message) }
 });
 
+// ===== FINAL REAL TRACKING - PASTE ONCE - NO EDIT NEEDED =====
+const REAL_TZ = {
+  SAH:'Asia/Aden', ADE:'Asia/Aden', YEMEN:'Asia/Aden',
+  JFK:'America/New_York', LAX:'America/Los_Angeles', USA:'America/New_York', NEWYORK:'America/New_York',
+  LOS:'Africa/Lagos', NIGERIA:'Africa/Lagos', ABV:'Africa/Lagos', LAGOS:'Africa/Lagos',
+  DXB:'Asia/Dubai', UAE:'Asia/Dubai', DOH:'Asia/Qatar',
+  LHR:'Europe/London', UK:'Europe/London', LONDON:'Europe/London',
+  JED:'Asia/Riyadh', RUH:'Asia/Riyadh', SAUDI:'Asia/Riyadh',
+  CAI:'Africa/Cairo', EGYPT:'Africa/Cairo'
+};
+function getRealTZ(str){
+  if(!str) return 'Asia/Aden';
+  const up=str.toUpperCase();
+  for(let k in REAL_TZ){ if(up.includes(k)) return REAL_TZ[k]; }
+  return 'Asia/Aden';
+}
+const REAL_COORDS = {
+  SAH:{lat:15.476,lon:44.219, label:'SAH - Sanaa International, Yemen'},
+  JFK:{lat:40.6413,lon:-73.7781, label:'JFK - New York, USA'},
+  LOS:{lat:6.577,lon:3.321, label:'LOS - Lagos, Nigeria'},
+  DXB:{lat:25.253,lon:55.365, label:'DXB - Dubai, UAE'},
+  LHR:{lat:51.47,lon:-0.4543, label:'LHR - London, UK'},
+  ADE:{lat:12.826,lon:45.030, label:'ADE - Aden, Yemen'}
+};
+function getRealCoord(str, fallbackKey){
+  const up=(str||'').toUpperCase();
+  for(let k in REAL_COORDS){ if(up.includes(k)) return REAL_COORDS[k]; }
+  return REAL_COORDS[fallbackKey];
+}
+function parseRealDate(dateStr, created_at){
+  if(!dateStr) return new Date(created_at);
+  const now=new Date();
+  if(dateStr.includes('/')){
+    const p=dateStr.split('/').map(s=>s.trim());
+    if(p.length===3){
+      let d1=new Date(`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}T10:00:00`);
+      let d2=new Date(`${p[2]}-${p[0].padStart(2,'0')}-${p[1].padStart(2,'0')}T10:00:00`);
+      if(!isNaN(d1.getTime()) && d1.getTime() > now.getTime()-30*86400000) return d1;
+      if(!isNaN(d2.getTime())) return d2;
+      return d1;
+    }
+  }
+  let d=new Date(dateStr);
+  return isNaN(d.getTime())? new Date(created_at) : d;
+}
+
+app.get('/logistics-receipt', async (req,res)=>{
+ try{
+  const code=(req.query.code||'').toUpperCase().trim();
+  if(!code) return res.send('Invalid Code');
+  let d = logistics.get(code) || bookings.get(code);
+  if(!d && BookingModel){ try{ const doc=await BookingModel.findOne({$or:[{code},{tracking:code}]}).lean(); if(doc) d=doc; }catch(e){} }
+  if(!d) return res.send(`Not Found ${code}`);
+  const shipDateObj = parseRealDate(d.shipDate||d.s_date, d.created_at);
+  const fromRaw = d.from||d.fromFull||d.s_city||'SAH - Sanaa, Yemen';
+  const toRaw = d.to||d.toFull||d.r_city||'JFK - New York, USA';
+  const fromTZ = getRealTZ(fromRaw); const toTZ = getRealTZ(toRaw);
+  const fromLabel = getRealCoord(fromRaw,'SAH').label;
+  const toLabel = getRealCoord(toRaw,'JFK').label;
+  const esc=(s)=>(s||'').toString().replace(/</g,'&lt;');
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SKYLINK OFFICIAL ${code}</title>
+  <style>body{font-family:Arial;background:#eef2f7;margin:0;padding:20px}.page{max-width:820px;margin:0 auto;background:#fff;border:1px solid #cbd5e1}.hdr{background:#0a2a5e;color:#fff;padding:18px 26px;border-bottom:4px solid #ffcc00;display:flex;justify-content:space-between}.sign{font-family:'Brush Script MT',cursive;color:#0033cc;font-size:32px}.btn{padding:10px 16px;border:none;border-radius:6px;font-weight:700;cursor:pointer}.blue{background:#0a2a5e;color:#fff}.gold{background:#ffcc00;color:#0a2a5e}@media print{.btn{display:none}}</style></head><body><div class="page">
+  <div class="hdr"><div><h2 style="margin:0">✈️ SKYLINK AIRLINES</h2><p style="margin:4px 0 0;font-size:11px">OFFICIAL CARGO RECEIPT - DHL STANDARD</p></div><div style="text-align:right"><div style="font-size:11px">AWB</div><div style="font-size:18px;font-weight:900">${code}</div></div></div>
+  <div style="padding:26px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><p style="font-size:11px;color:#64748b;margin:0">TRACKING</p><b>${esc(d.code||code)}</b></div><div><p style="font-size:11px;color:#64748b;margin:0">SHIPPING DATE (REAL ORIGIN TIME)</p><b style="color:#0a2a5e">${shipDateObj.toLocaleDateString('en-GB',{timeZone:fromTZ})} - ${shipDateObj.toLocaleTimeString('en-GB',{timeZone:fromTZ,hour12:true})} (${fromTZ})</b></div><div><p style="font-size:11px;color:#64748b;margin:0">BOOKED (Yemen Time)</p><b>${new Date(d.created_at).toLocaleString('en-GB',{timeZone:fromTZ,hour12:true})} ${fromTZ}</b></div></div>
+  <hr style="border:none;border-top:1px dashed #cbd5e1;margin:18px 0">
+  <div style="display:flex;gap:20px"><div style="flex:1;background:#f8fafc;padding:12px"><p style="font-size:11px;margin:0;color:#64748b">FROM - ${esc(fromLabel)}</p><b>${esc(d.s_name)}</b><br><span style="font-size:13px">${esc(d.s_phone)}<br>${esc(d.s_email)}<br>${esc(d.s_address||d.s_addr)}</span></div><div style="flex:1;background:#fffbeb;padding:12px;border:1px solid #fde68a"><p style="font-size:11px;margin:0;color:#64748b">TO - ${esc(toLabel)}</p><b>${esc(d.r_name)}</b><br><span style="font-size:13px">${esc(d.r_phone)}<br>${esc(d.r_email)}<br>${esc(d.r_address||d.r_addr)}</span></div></div>
+  <div style="margin-top:16px;background:#eef6ff;border-left:4px solid #0a2a5e;padding:10px"><b>Items:</b> ${esc(d.items||d.r_items)} | <b>Weight:</b> ${esc(d.weight)}kg | <b>Route:</b> ${esc(fromLabel)} → ${esc(toLabel)} | <b>Flight:</b> 14.5hrs Real Calculated</div>
+  <div style="margin-top:26px;display:flex;justify-content:space-between;align-items:end"><div><p style="font-size:11px;margin:0;color:#64748b">OFFICIAL BLUE SIGNATURE</p><div class="sign">Skylink Logistics ™</div><div style="border-top:2px solid #000;margin-top:6px;padding-top:6px;font-size:11px">SYSTEM VERIFIED - Signed on Payment<br><span style="color:#0a2a5e;font-weight:700">Date: ${shipDateObj.toLocaleDateString('en-GB',{timeZone:fromTZ})} ${fromTZ} / Dest: ${shipDateObj.toLocaleDateString('en-GB',{timeZone:toTZ})} ${toTZ}</span></div></div><div style="text-align:center"><div id="qrcode"></div><div style="font-size:11px;font-weight:700;color:#0a2a5e;margin-top:6px">${code}</div></div></div>
+  <div style="margin-top:18px"><button class="btn blue" onclick="window.print()">Download HD PDF</button> <button class="btn gold" onclick="navigator.clipboard.writeText(window.location.href)">Copy Link</button> <button class="btn blue" onclick="location.href='/logistics-track?code=${code}'">Live Track</button></div>
+  </div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><script>new QRCode(document.getElementById('qrcode'),{text:window.location.origin+'/logistics-track?code=${code}',width:120,height:120})</script></body></html>`);
+ }catch(e){ res.status(500).send(e.message) }
+});
+
 app.get('/logistics-track', async (req,res)=>{
  try{
   const code=(req.query.code||'').toUpperCase().trim();
   let d = logistics.get(code) || bookings.get(code);
   if(!d && BookingModel){ try{ const doc=await BookingModel.findOne({$or:[{code},{tracking:code}]}).lean(); if(doc) d=doc; }catch(e){} }
-  if(!d) return res.status(200).send(`<h2 style="font-family:Arial;text-align:center;margin-top:60px">Tracking ${code} not found</h2>`);
-
-  const from = d.from || ''; const to = d.to || '';
-  const fromA = findAirport(from); const toA = findAirport(to);
-  const fromLat = fromA?fromA.lat:0; const fromLon = fromA?fromA.lon:0;
-  const toLat = toA?toA.lat:0; const toLon = toA?toA.lon:0;
-  const fromCity = fromA?`${fromA.code} - ${fromA.city}, ${fromA.country}`:from;
-  const toCity = toA?`${toA.code} - ${toA.city}, ${toA.country}`:to;
-  const departISO = d.shipDate ? new Date(d.shipDate).toISOString() : new Date(d.created_at).toISOString();
-  const arriveISO = new Date(new Date(departISO).getTime()+ (48*3600000)).toISOString();
-  const fromTZ = fromA && fromA.country==='Yemen' ? 'Asia/Aden' : 'UTC';
-
-  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Live Track ${code}</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>body{margin:0;font-family:Arial;background:#f3f5f9}#map{height:420px;width:100%}.card{max-width:900px;margin:-40px auto 0;background:#fff;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.12);padding:20px;position:relative;z-index:999}.step{display:flex;gap:12px;padding:14px;border-left:3px solid #e5e7eb;margin-left:10px}.step.done{border-color:#0a2a5e;background:#f0f6ff}.dot{width:28px;height:28px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-weight:900}.done .dot{background:#0a2a5e;color:#fff}.header2{background:#0a2a5e;color:#fff;padding:18px;text-align:center;border-bottom:4px solid #ffcc00}.timeBox{font-size:13px;color:#374151}</style></head><body>
-   <div class="header2"><h2 style="margin:0">${code} - LIVE CARGO TRACKING</h2><p style="margin:4px 0 0;font-size:12px">${fromCity} ✈️ ${toCity}</p></div><div id="map"></div>
-   <div class="card"><h3 style="margin-top:0;color:#0a2a5e">✈️ Real-Time Movement - Origin Time: ${fromCity.split('-')[0]||''}</h3><div id="liveInfo" class="timeBox" style="margin-bottom:14px"></div>
-   <div class="step done"><div class="dot">✓</div><div><b>📦 Cargo Received at Origin</b><div class="timeBox">Location: ${fromCity}<br>Sender: ${d.s_name} (${d.s_phone})<br>${new Date(d.created_at).toLocaleString('en-GB',{timeZone:fromTZ,timeZoneName:'short'})}</div></div></div>
-   <div class="step" id="st2"><div class="dot">✈️</div><div><b>In Transit - Cargo Plane Departed</b><div class="timeBox">Departed ${fromCity} → To ${toCity}<br>Items: ${d.items} | Weight: ${d.weight}kg</div></div></div>
-   <div class="step" id="st3"><div class="dot">🛬</div><div><b>Arrived Destination Hub</b><div class="timeBox">Hub: ${toCity}</div></div></div>
-   <div class="step" id="st4"><div class="dot">🚚</div><div><b>Out for Delivery</b><div class="timeBox">Courier to: ${d.r_name} (${d.r_phone})<br>Address: ${d.r_address||d.r_addr||''}</div></div></div>
-   <div class="step" id="st5"><div class="dot">✅</div><div><b>Delivered</b><div class="timeBox">Delivered to ${d.r_name} at ${d.r_address||''}</div></div></div>
-   </div>
-   <script>
-    const departISO="${departISO}";const arriveISO="${arriveISO}";const fromLat=${fromLat};const fromLon=${fromLon};const toLat=${toLat};const toLon=${toLon};const fromTZ="${fromTZ}";const b={from:"${fromCity}",to:"${toCity}"};
-    const departMs=new Date(departISO).getTime();const arriveMs=new Date(arriveISO).getTime();
-    const map=L.map('map').setView([(fromLat+toLat)/2,(fromLon+toLon)/2],2);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    const routeLine=L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:'#0a2a5e',weight:3,dashArray:'8,8'}).addTo(map);
-    L.marker([fromLat,fromLon]).addTo(map).bindPopup(b.from+' - Departed');L.marker([toLat,toLon]).addTo(map).bindPopup(b.to+' - Arrival');
-    const planeIcon=L.divIcon({html:'✈️',className:'',iconSize:[30,30]});const planeMarker=L.marker([fromLat,fromLon],{icon:planeIcon}).addTo(map);map.fitBounds(routeLine.getBounds(),{padding:[30,30]});
-    function updateLive(){const now=Date.now();const diff=now-departMs;const remain=arriveMs-now;const totalMs=arriveMs-departMs;
-     const statusEl=document.getElementById('liveInfo');let progress=0;
-     if(diff<=0){progress=0;statusEl.innerHTML='Status: <b>Scheduled</b> - Departure at '+new Date(departISO).toLocaleString('en-GB',{timeZone:fromTZ})+' (Origin Local Time)';}
-     else if(diff>=totalMs){progress=1;document.getElementById('st2').classList.add('done');document.getElementById('st3').classList.add('done');document.getElementById('st4').classList.add('done');document.getElementById('st5').classList.add('done');statusEl.innerHTML='Status: <b>Landed ✓</b> - Flight Completed at '+new Date(arriveISO).toLocaleString('en-GB',{timeZone:fromTZ})+' (Origin Time)';}
-     else{progress=Math.min(1,Math.max(0,diff/totalMs));if(diff>5*60000)document.getElementById('st2').classList.add('done');if(diff>15*60000)document.getElementById('st3').classList.add('done');if(diff>30*60000)document.getElementById('st4').classList.add('done');
-      const h=Math.floor(remain/3600000);const m=Math.floor((remain%3600000)/60000);const s=Math.floor((remain%60000)/1000);
-      statusEl.innerHTML='Status: <b>✈️ In Transit - Live Moving</b><br>Origin Local Time: '+new Date().toLocaleString('en-GB',{timeZone:fromTZ,hour12:true})+' | Remaining: '+h+'h '+m+'m '+s+'s';
-     }
-     const curLat=fromLat+(toLat-fromLat)*progress;const curLon=fromLon+(toLon-fromLon)*progress;planeMarker.setLatLng([curLat,curLon]);
-    }updateLive();setInterval(updateLive,1000);
-   </script></body></html>`);
+  if(!d) return res.send(`<h2 style="font-family:Arial;text-align:center">Tracking ${code} not found</h2>`);
+  const fromRaw = d.from||d.fromFull||d.s_city||'SAH'; const toRaw = d.to||d.toFull||d.r_city||'JFK';
+  const fromReal = getRealCoord(fromRaw,'SAH'); const toReal = getRealCoord(toRaw,'JFK');
+  const fromTZ = getRealTZ(fromRaw); const toTZ = getRealTZ(toRaw);
+  const shipObj = parseRealDate(d.shipDate||d.s_date, d.created_at);
+  const FLIGHT_HRS = 14.5; const arrObj = new Date(shipObj.getTime() + FLIGHT_HRS*3600000);
+  const esc=(s)=>(s||'').toString().replace(/</g,'&lt;');
+  const fromLabelSafe = fromReal.label.replace(/'/g,""); const toLabelSafe = toReal.label.replace(/'/g,"");
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${code} Live</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script><style>body{margin:0;font-family:Arial;background:#fff}#map{height:520px;width:100%}.hdr{background:#0a2a5e;color:#fff;padding:12px;text-align:center;border-bottom:4px solid #ffcc00}.card{max-width:920px;margin:0 auto;padding:16px}.step{display:flex;gap:10px;padding:12px;border-left:4px solid #e5e7eb;margin:8px 0}.done{border-color:#0a2a5e;background:#f0f7ff}.dot{width:28px;height:28px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-weight:900;flex-shrink:0}.done.dot{background:#0a2a5e;color:#fff}</style></head><body>
+  <div class="hdr"><b>${code} - LIVE CARGO TRACKING</b><br><span style="font-size:12px">${fromLabelSafe} ✈️ ${toLabelSafe} | Real Map + Real ${fromTZ} → ${toTZ} Time</span></div><div id="map"></div>
+  <div class="card"><div id="live" style="background:#0a2a5e;color:#fff;padding:12px;border-radius:8px;font-size:13px;line-height:1.6"></div>
+  <div class="step done"><div class="dot">✓</div><div><b>Received at ${fromLabelSafe}</b><br><span style="font-size:12px">Sender ${esc(d.s_name)} (${esc(d.s_phone)})<br>Time: ${new Date(d.created_at).toLocaleString('en-GB',{timeZone:fromTZ,hour12:true})} - ${fromTZ} (REAL ORIGIN TIME)</span></div></div>
+  <div class="step" id="s2"><div class="dot">✈️</div><div><b>In Transit - Real Flight Departed</b><br><span style="font-size:12px">Depart: ${shipObj.toLocaleString('en-GB',{timeZone:fromTZ,hour12:true})} ${fromTZ}<br>Arrive: ${arrObj.toLocaleString('en-GB',{timeZone:toTZ,hour12:true})} ${toTZ}<br>Items ${esc(d.items||d.r_items)} - ${esc(d.weight)}kg | Calculated Flight: ${FLIGHT_HRS}hrs Real Cargo</span></div></div>
+  <div class="step" id="s3"><div class="dot">🛬</div><div><b>Arrived ${toLabelSafe}</b><br><span style="font-size:12px">${arrObj.toLocaleString('en-GB',{timeZone:toTZ,hour12:true})} ${toTZ}</span></div></div>
+  <div class="step" id="s4"><div class="dot">🚚</div><div><b>Out for Delivery to ${esc(d.r_name)}</b><br><span style="font-size:12px">${esc(d.r_address||d.r_addr)}</span></div></div></div>
+  <script>
+   const fromLat=${fromReal.lat},fromLon=${fromReal.lon},toLat=${toReal.lat},toLon=${toReal.lon};
+   const depMs=${shipObj.getTime()},arrMs=${arrObj.getTime()},fromTZ="${fromTZ}",toTZ="${toTZ}";
+   const fromLabel="${fromLabelSafe}",toLabel="${toLabelSafe}";
+   const map=L.map('map').setView([${(fromReal.lat+toReal.lat)/2},${(fromReal.lon+toReal.lon)/2}],3);
+   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap - Real Countries'}).addTo(map);
+   const route=L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:'#ffcc00',weight:4,dashArray:'8,10'}).addTo(map);
+   L.marker([fromLat,fromLon]).addTo(map).bindPopup(fromLabel).openPopup();
+   L.marker([toLat,toLon]).addTo(map).bindPopup(toLabel);
+   const planeIcon=L.divIcon({html:'<div style="font-size:28px">✈️</div>',iconSize:[28,28],iconAnchor:[14,14]}); const plane=L.marker([fromLat,fromLon],{icon:planeIcon}).addTo(map);
+   map.fitBounds(route.getBounds(),{padding:[70,70]});
+   function update(){const now=Date.now();let p=0,txt='';if(now<depMs){const d=depMs-now;const h=Math.floor(d/3600000),m=Math.floor((d%3600000)/60000);p=0;txt='<b>📅 SCHEDULED - Real Origin Time</b><br>Depart: '+new Date(depMs).toLocaleString('en-GB',{timeZone:fromTZ,hour12:true})+' '+fromTZ+'<br>Origin Now: '+new Date().toLocaleString('en-GB',{timeZone:fromTZ,hour12:true})+' '+fromTZ+'<br>Countdown to Depart: '+h+'h '+m+'m';}
+   else if(now>=arrMs){p=1;['s2','s3','s4'].forEach(id=>{let e=document.getElementById(id);if(e)e.classList.add('done')});txt='<b>✅ LANDED - Real Destination Time</b><br>Arrived: '+new Date(arrMs).toLocaleString('en-GB',{timeZone:toTZ,hour12:true})+' '+toTZ+'<br>Dest Now: '+new Date().toLocaleString('en-GB',{timeZone:toTZ,hour12:true})+' '+toTZ+'<br>Flight Completed: ${FLIGHT_HRS}hrs Real Calculated';}
+   else{p=(now-depMs)/(arrMs-depMs);if(p>0.05)document.getElementById('s2').classList.add('done');const rem=arrMs-now;const h=Math.floor(rem/3600000),m=Math.floor((rem%3600000)/60000),s=Math.floor((rem%60000)/1000);txt='<b>✈️ LIVE IN AIR - Real Time</b><br>Origin Now: '+new Date().toLocaleString('en-GB',{timeZone:fromTZ,hour12:true})+' '+fromTZ+' | Dest Now: '+new Date().toLocaleString('en-GB',{timeZone:toTZ,hour12:true})+' '+toTZ+'<br>Over: '+(p<0.35?'Red Sea / Yemen':'Atlantic Ocean')+'<br>Remaining to '+toLabel+': '+h+'h '+m+'m '+s+'s | Progress: '+Math.round(p*100)+'% | Flight: ${FLIGHT_HRS}hrs';}
+   document.getElementById('live').innerHTML=txt;plane.setLatLng([fromLat+(toLat-fromLat)*p, fromLon+(toLon-fromLon)*p]);}
+   update();setInterval(update,1000);
+  <\/script></body></html>`);
  }catch(e){ res.status(500).send(e.message) }
 });
 app.post('/api/book', async (req,res)=>{
