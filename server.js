@@ -461,12 +461,14 @@ app.get('/logistics-receipt', async (req,res)=>{
 // ===== FINAL REAL TRACKING - PASTE ONCE - NO EDIT NEEDED =====
 const REAL_TZ = {
   SAH:'Asia/Aden', ADE:'Asia/Aden', YEMEN:'Asia/Aden',
-  JFK:'America/New_York', LAX:'America/Los_Angeles', USA:'America/New_York', NEWYORK:'America/New_York',
-  LOS:'Africa/Lagos', NIGERIA:'Africa/Lagos', ABV:'Africa/Lagos', LAGOS:'Africa/Lagos',
+  JFK:'America/New_York', LAX:'America/Los_Angeles', USA:'America/New_York', ORD:'America/Chicago', CHICAGO:'America/Chicago',
+  LOS:'Africa/Lagos', NIGERIA:'Africa/Lagos', ABV:'Africa/Lagos',
   DXB:'Asia/Dubai', UAE:'Asia/Dubai', DOH:'Asia/Qatar',
   LHR:'Europe/London', UK:'Europe/London', LONDON:'Europe/London',
   JED:'Asia/Riyadh', RUH:'Asia/Riyadh', SAUDI:'Asia/Riyadh',
-  CAI:'Africa/Cairo', EGYPT:'Africa/Cairo'
+  CAI:'Africa/Cairo', EGYPT:'Africa/Cairo',
+  SVO:'Europe/Moscow', DME:'Europe/Moscow', LED:'Europe/Moscow', RUSSIA:'Europe/Moscow', MOSCOW:'Europe/Moscow',
+  DAM:'Asia/Damascus', ALP:'Asia/Damascus', SYRIA:'Asia/Damascus'
 };
 function getRealTZ(str){
   if(!str) return 'Asia/Aden';
@@ -477,10 +479,18 @@ function getRealTZ(str){
 const REAL_COORDS = {
   SAH:{lat:15.476,lon:44.219, label:'SAH - Sanaa International, Yemen'},
   JFK:{lat:40.6413,lon:-73.7781, label:'JFK - New York, USA'},
+  ORD:{lat:41.974162,lon:-87.907321, label:'ORD - Chicago, USA'},
   LOS:{lat:6.577,lon:3.321, label:'LOS - Lagos, Nigeria'},
   DXB:{lat:25.253,lon:55.365, label:'DXB - Dubai, UAE'},
   LHR:{lat:51.47,lon:-0.4543, label:'LHR - London, UK'},
-  ADE:{lat:12.826,lon:45.030, label:'ADE - Aden, Yemen'}
+  ADE:{lat:12.826,lon:45.030, label:'ADE - Aden, Yemen'},
+  SVO:{lat:55.972642,lon:37.414589, label:'SVO - Moscow, Russia'},
+  DME:{lat:55.4088,lon:37.9061, label:'DME - Moscow, Russia'},
+  LED:{lat:59.8003,lon:30.2625, label:'LED - St Petersburg, Russia'},
+  RUSSIA:{lat:55.972642,lon:37.414589, label:'RUSSIA - Moscow, Russia'},
+  DAM:{lat:33.4106,lon:36.5156, label:'DAM - Damascus, Syria'},
+  ALP:{lat:36.1807,lon:37.2243, label:'ALP - Aleppo, Syria'},
+  SYRIA:{lat:33.4106,lon:36.5156, label:'SYRIA - Damascus, Syria'}
 };
 function getRealCoord(str, fallbackKey){
   const up=(str||'').toUpperCase();
@@ -513,10 +523,10 @@ app.get('/logistics-receipt', async (req,res)=>{
   if(!d) return res.send(`Not Found ${code}`);
   const shipDateObj = parseRealDate(d.shipDate||d.s_date, d.created_at);
   const fromRaw = d.from||d.fromFull||d.s_city||'SAH - Sanaa, Yemen';
-  const toRaw = d.to||d.toFull||d.r_city||'JFK - New York, USA';
+  const toRaw = d.to||d.toFull||d.r_city||d.destination||'RUSSIA - Moscow, Russia';
   const fromTZ = getRealTZ(fromRaw); const toTZ = getRealTZ(toRaw);
   const fromLabel = getRealCoord(fromRaw,'SAH').label;
-  const toLabel = getRealCoord(toRaw,'JFK').label;
+  const toLabel = getRealCoord(toRaw,'SVO').label;
   const esc=(s)=>(s||'').toString().replace(/</g,'&lt;');
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SKYLINK OFFICIAL ${code}</title>
   <style>body{font-family:Arial;background:#eef2f7;margin:0;padding:20px}.page{max-width:820px;margin:0 auto;background:#fff;border:1px solid #cbd5e1}.hdr{background:#0a2a5e;color:#fff;padding:18px 26px;border-bottom:4px solid #ffcc00;display:flex;justify-content:space-between}.sign{font-family:'Brush Script MT',cursive;color:#0033cc;font-size:32px}.btn{padding:10px 16px;border:none;border-radius:6px;font-weight:700;cursor:pointer}.blue{background:#0a2a5e;color:#fff}.gold{background:#ffcc00;color:#0a2a5e}@media print{.btn{display:none}}</style></head><body><div class="page">
