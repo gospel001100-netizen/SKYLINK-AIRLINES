@@ -447,7 +447,6 @@ function updateLive(){
 updateLive();setInterval(updateLive,1000);
 <\/script></body></html>`);
 });
-});
 
 // FIRST DISPLAY - 2 OPTIONS LANDING
 app.get("/", (req,res)=>{
