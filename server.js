@@ -193,7 +193,7 @@ initDB();
 app.get('/skylink-admin-login', (req,res)=>{ res.send(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#0f2e6d;display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial}.card{background:#fff;padding:30px;border-radius:16px;width:100%;max-width:360px;box-shadow:0 10px 40px rgba(0,0,0,.3)}input{width:100%;padding:13px;border-radius:10px;border:1.5px solid #e2e8f0;margin-top:12px;box-sizing:border-box;font-size:14px}button{width:100%;background:#0f2e6d;color:#fff;padding:13px;border-radius:10px;border:none;font-weight:900;margin-top:14px;cursor:pointer}</style></head><body><div class="card"><div style="text-align:center;font-weight:900;font-size:20px">✈️ SKYLINK ADMIN</div><div style="text-align:center;font-size:11px;color:#64748b;margin-top:6px;letter-spacing:1px">ADMIN LOGIN ONLY</div><form method="POST" action="/api/admin-login"><input type="password" name="password" placeholder="Enter admin password" required><button type="submit">Login →</button></form></div></body></html>`);});
 app.post('/api/admin-login', (req,res)=>{ const pass = req.body.password || ''; if(pass === ADMIN_PASSWORD){ res.setHeader('Set-Cookie', 'admin_auth=Skylink1824; Path=/; Max-Age=86400; HttpOnly'); res.redirect('/skylink-admin-gospel-2024'); } else { res.send('<script>alert("Wrong password"); location.href="/skylink-admin-login"</script>'); } });
 app.get('/skylink-admin-logout', (req,res)=>{ res.setHeader('Set-Cookie', 'admin_auth=; Path=/; Max-Age=0'); res.redirect('/skylink-admin-login'); });
-app.get('/', (req,res)=>{
+app.get('/airlines', (req,res)=>{
   const aj = JSON.stringify(AIRPORTS);
   const pk = process.env.PAYSTACK_PUBLIC_KEY || 'pk_live_d820c59c33c0628f48f10176e8ff25b243fd6c73';
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>SKYLINK AIRLINES</title><script src="https://js.paystack.co/v1/inline.js"><\/script><style>
@@ -447,6 +447,13 @@ function updateLive(){
 updateLive();setInterval(updateLive,1000);
 <\/script></body></html>`);
 });
+});
+
+// FIRST DISPLAY - 2 OPTIONS LANDING
+app.get("/", (req,res)=>{
+res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#f1f5f9;font-family:Arial} .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px} .card{width:100%;max-width:420px;background:#fff;border-radius:22px;padding:32px;text-align:center;box-shadow:0 15px 40px rgba(0,0,0,.1)} .logo{font-size:28px;font-weight:900;color:#0f2e6d} .logo span{color:#facc15} h3{margin:18px 0 20px;color:#334155} a{display:block;text-decoration:none;padding:18px;border-radius:13px;font-weight:900;margin-top:14px;font-size:15px} .a1{background:#0f2e6d;color:#fff} .a2{background:#facc15;color:#0f2e6d} p{font-size:10px;color:#94a3b8;margin-top:20px;font-weight:800}</style></head><body><div class="wrap"><div class="card"><div class="logo">SKYLINK <span>GROUP</span></div><h3>Welcome - Choose Your Service</h3><a class="a1" href="/airlines">✈️ SKYLINK AIRLINES<br><small style="font-weight:700">Book Flights</small></a><a class="a2" href="/logistics">📦 SKYLINK LOGISTICS<br><small style="font-weight:700">Ship & Track Package</small></a><p>www.skylinkairlines.com.ng - Official Portal</p></div></div></body></html>`);
+});
+
 logistics.install(app, { airports: AIRPORTS });
 
 app.get('/health',(req,res)=> res.send('OK'));
