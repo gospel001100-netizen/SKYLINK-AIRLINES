@@ -168,6 +168,7 @@ function createModel() {
       customerName: String,
       customerEmail: String,
       customerPhone: String,
+      receiverName: String,
 
       originCountry: String,
       originCity: String,
@@ -1284,6 +1285,8 @@ async function initializePayment(req, res) {
 
     const customerPhone =
       clean(body.customerPhone, 40);
+    const receiverName =
+  clean(body.receiverName, 120);
 
     const originCountry =
       clean(body.originCountry, 100);
@@ -1308,6 +1311,7 @@ if(
       !customerName ||
       !customerEmail ||
       !customerPhone ||
+      !receiverName ||
       !originCountry ||
       !originCity ||
       !destinationCountry ||
@@ -1400,6 +1404,7 @@ if(
       customerEmail,
 
       customerPhone,
+      receiverName,
 
       originCountry,
 
