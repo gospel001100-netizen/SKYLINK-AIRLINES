@@ -6,6 +6,7 @@ const path = require('path');
 let QRCode = null; try{ QRCode = require('qrcode'); }catch(e){}
 let mongoose = null; try{ mongoose = require('mongoose'); }catch(e){}
 let DateTime = null; try{ DateTime = require('luxon').DateTime; }catch(e){ console.log('luxon not installed - install luxon for real timezone'); }
+const logistics = require('./logistics.js');
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -446,5 +447,7 @@ function updateLive(){
 updateLive();setInterval(updateLive,1000);
 <\/script></body></html>`);
 });
+logistics.install(app, { airports: AIRPORTS });
+
 app.get('/health',(req,res)=> res.send('OK'));
 app.listen(PORT, ()=> console.log('SKYLINK V9 REAL TZ + OLD BOOKING AUTO-FIX READY'));
