@@ -191,6 +191,8 @@ function createModel() {
       packageDescription: String,
       packageWeight: String,
       packageQuantity: String,
+      shipDate: String,
+      shipTime: String,
 
       status: {
         type: String,
@@ -1079,9 +1081,13 @@ document
       packageQuantity:
         document.getElementById("packageQuantity")
         .value.trim(),
-      shipDate: document.getElementById("shipDate").value,
-      shipTime: document.getElementById("shipTime").value
-    };
+            shipDate:
+        document.getElementById("shipDate")
+        .value.trim(),
+
+      shipTime:
+        document.getElementById("shipTime")
+        .value.trim(),
 
     try{
 
@@ -1292,9 +1298,13 @@ async function initializePayment(req, res) {
       clean(body.destinationCity, 100);
 
     const packageDescription =
-      clean(body.packageDescription, 250);
+  clean(body.packageDescription, 250);
+const shipDate =
+  clean(body.shipDate, 30);
+const shipTime =
+  clean(body.shipTime, 30);
 
-    if(
+if(
       !customerName ||
       !customerEmail ||
       !customerPhone ||
@@ -1302,7 +1312,9 @@ async function initializePayment(req, res) {
       !originCity ||
       !destinationCountry ||
       !destinationCity ||
-      !packageDescription
+      !packageDescription ||
+!shipDate ||
+!shipTime
     ) {
 
       return res.status(400).json({
@@ -1434,6 +1446,8 @@ async function initializePayment(req, res) {
       distanceKm,
 
       packageDescription,
+      shipDate,
+      shipTime,
 
       packageWeight:
         clean(body.packageWeight, 50),
