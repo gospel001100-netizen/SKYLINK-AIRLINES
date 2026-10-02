@@ -729,6 +729,13 @@ textarea:focus{
   maxlength="40"
   placeholder="Phone number">
 
+<label>Receiver Name *</label>
+<input
+  id="receiverName"
+  required
+  maxlength="120"
+  placeholder="Receiver full name">
+
 <div class="section">
 
 <h2>Shipment Route</h2>
@@ -1033,6 +1040,10 @@ document
         document.getElementById("customerPhone")
         .value.trim(),
 
+      receiverName:
+        document.getElementById("receiverName")
+        .value.trim(),
+
       originCountry:
         selectedOrigin.country,
 
@@ -1082,13 +1093,16 @@ document
       packageQuantity:
         document.getElementById("packageQuantity")
         .value.trim(),
-            shipDate:
+
+      shipDate:
         document.getElementById("shipDate")
         .value.trim(),
 
       shipTime:
         document.getElementById("shipTime")
-        .value.trim(),
+        .value.trim()
+
+    };
 
     try{
 
@@ -1285,8 +1299,9 @@ async function initializePayment(req, res) {
 
     const customerPhone =
       clean(body.customerPhone, 40);
+
     const receiverName =
-  clean(body.receiverName, 120);
+      clean(body.receiverName, 120);
 
     const originCountry =
       clean(body.originCountry, 100);
@@ -1301,13 +1316,15 @@ async function initializePayment(req, res) {
       clean(body.destinationCity, 100);
 
     const packageDescription =
-  clean(body.packageDescription, 250);
-const shipDate =
-  clean(body.shipDate, 30);
-const shipTime =
-  clean(body.shipTime, 30);
+      clean(body.packageDescription, 250);
 
-if(
+    const shipDate =
+      clean(body.shipDate, 30);
+
+    const shipTime =
+      clean(body.shipTime, 30);
+
+    if(
       !customerName ||
       !customerEmail ||
       !customerPhone ||
@@ -1317,8 +1334,8 @@ if(
       !destinationCountry ||
       !destinationCity ||
       !packageDescription ||
-!shipDate ||
-!shipTime
+      !shipDate ||
+      !shipTime
     ) {
 
       return res.status(400).json({
@@ -1404,6 +1421,7 @@ if(
       customerEmail,
 
       customerPhone,
+
       receiverName,
 
       originCountry,
@@ -1451,7 +1469,9 @@ if(
       distanceKm,
 
       packageDescription,
+
       shipDate,
+
       shipTime,
 
       packageWeight:
@@ -2355,6 +2375,13 @@ ${escapeHtml(record.tracking)}
 <div class="label">Customer</div>
 <div class="value">
 ${escapeHtml(record.customerName)}
+</div>
+</div>
+
+<div class="item">
+<div class="label">Receiver Name</div>
+<div class="value">
+${escapeHtml(record.receiverName)}
 </div>
 </div>
 
