@@ -1,0 +1,3787 @@
+// logistics.js
+// SKYLINK LOGISTICS - REAL PAYSTACK + PERMANENT MONGODB RECORDS
+// Designed to be installed alongside the existing SKYLINK AIRLINES V9 server.
+// Does not modify existing Airlines booking logic.
+
+const crypto = require('crypto');
+
+let QRCode = null;
+try {
+  QRCode = require('qrcode');
+} catch (e) {
+  console.log('QRCode package not available.');
+}
+
+let mongoose = null;
+try {
+  mongoose = require('mongoose');
+} catch (e) {
+  console.log('Mongoose not available.');
+}
+
+let DateTime = null;
+try {
+  DateTime = require('luxon').DateTime;
+} catch (e) {
+  console.log('Luxon not available.');
+}
+
+const LOGISTICS_PRICE_NGN = 3000;
+const LOGISTICS_AMOUNT_KOBO = LOGISTICS_PRICE_NGN * 100;
+
+let LogisticsModel = null;
+let logisticsReady = false;
+
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+*/
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function clean(value, max = 500) {
+  return String(value == null ? '' : value).trim().slice(0, max);
+}
+
+function makeTrackingCode() {
+  return (
+    'SLK-' +
+    Date.now().toString(36).toUpperCase() +
+    '-' +
+    crypto.randomBytes(3).toString('hex').toUpperCase()
+  );
+}
+
+function makeShipmentId() {
+  return (
+    'SLS-' +
+    Date.now().toString(36).toUpperCase() +
+    '-' +
+    crypto.randomBytes(3).toString('hex').toUpperCase()
+  );
+}
+
+function makeReference() {
+  return (
+    'SLKLOG-' +
+    Date.now().toString(36).toUpperCase() +
+    crypto.randomBytes(4).toString('hex').toUpperCase()
+  );
+}
+
+function baseUrl(req) {
+  const configured = String(
+    process.env.PUBLIC_BASE_URL || 'https://www.skylinkairlines.com.ng'
+  ).trim();
+
+  return configured.replace(/\/+$/, '');
+}
+
+function trackingUrl(req, tracking) {
+  return baseUrl(req) + '/logistics/track/' + encodeURIComponent(tracking);
+}
+
+function nowISO() {
+  return new Date().toISOString();
+}
+
+function formatDate(iso, zone) {
+  try {
+    if (DateTime) {
+      return DateTime.fromISO(iso, { zone: zone || 'UTC' }).toFormat(
+        'dd LLL yyyy, hh:mm a ZZZZ'
+      );
+    }
+
+    return new Date(iso).toLocaleString('en-US', {
+      timeZone: zone || 'UTC',
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+  } catch (e) {
+    return new Date(iso).toISOString();
+  }
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+
+  const p1 = Number(lat1) * Math.PI / 180;
+  const p2 = Number(lat2) * Math.PI / 180;
+
+  const dLat = (Number(lat2) - Number(lat1)) * Math.PI / 180;
+  const dLon = (Number(lon2) - Number(lon1)) * Math.PI / 180;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(p1) *
+      Math.cos(p2) *
+      Math.sin(dLon / 2) ** 2;
+
+  return Math.round(
+    R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
+| MongoDB
+|--------------------------------------------------------------------------
+*/
+
+function createModel() {
+  if (!mongoose || !mongoose.connection) return null;
+
+  if (mongoose.models.SkylinkLogisticsShipment) {
+    return mongoose.models.SkylinkLogisticsShipment;
+  }
+
+  const schema = new mongoose.Schema(
+    {
+      shipmentId: {
+        type: String,
+        unique: true,
+        index: true
+      },
+
+      tracking: {
+        type: String,
+        unique: true,
+        index: true
+      },
+
+      paymentReference: {
+        type: String,
+        unique: true,
+        sparse: true,
+        index: true
+      },
+
+      customerName: String,
+      customerEmail: String,
+      customerPhone: String,
+
+      originCountry: String,
+      originCity: String,
+      originAddress: String,
+
+      destinationCountry: String,
+      destinationCity: String,
+      destinationAddress: String,
+
+      originLat: Number,
+      originLon: Number,
+
+      destinationLat: Number,
+      destinationLon: Number,
+
+      originTimezone: String,
+      destinationTimezone: String,
+
+      distanceKm: Number,
+
+      packageDescription: String,
+      packageWeight: String,
+      packageQuantity: String,
+
+      status: {
+        type: String,
+        default: 'Payment Pending'
+      },
+
+      paymentStatus: {
+        type: String,
+        default: 'pending'
+      },
+
+      paymentVerified: {
+        type: Boolean,
+        default: false
+      },
+
+      currency: {
+        type: String,
+        default: 'NGN'
+      },
+
+      amountKobo: {
+        type: Number,
+        default: LOGISTICS_AMOUNT_KOBO
+      },
+
+      paystackReference: String,
+
+      createdAt: String,
+      paidAt: String,
+      updatedAt: String,
+
+      approvedAt: String,
+      approvalText: {
+        type: String,
+        default: 'Electronically approved by Skylink Logistics'
+      }
+    },
+    {
+      collection: 'skylink_logistics_shipments',
+      timestamps: false
+    }
+  );
+
+  return mongoose.model(
+    'SkylinkLogisticsShipment',
+    schema
+  );
+}
+
+async function initLogisticsDB() {
+  if (!mongoose) {
+    console.log('SKYLINK LOGISTICS: mongoose unavailable.');
+    return;
+  }
+
+  if (mongoose.connection.readyState === 1) {
+    LogisticsModel = createModel();
+    logisticsReady = !!LogisticsModel;
+    return;
+  }
+
+  if (!process.env.MONGODB_URI) {
+    console.log(
+      'SKYLINK LOGISTICS WARNING: MONGODB_URI is not configured.'
+    );
+    console.log(
+      'Logistics requires MongoDB for permanent production records.'
+    );
+    return;
+  }
+
+  try {
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(process.env.MONGODB_URI);
+    }
+
+    LogisticsModel = createModel();
+    logisticsReady = !!LogisticsModel;
+
+    console.log('SKYLINK LOGISTICS MongoDB ready.');
+  } catch (err) {
+    console.error(
+      'SKYLINK LOGISTICS MongoDB error:',
+      err.message
+    );
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Paystack
+|--------------------------------------------------------------------------
+*/
+
+function getPaystackSecret() {
+  return String(process.env.PAYSTACK_SECRET_KEY || '').trim();
+}
+
+async function paystackRequest(endpoint, options = {}) {
+  const secret = getPaystackSecret();
+
+  if (!secret) {
+    throw new Error(
+      'PAYSTACK_SECRET_KEY is not configured on the server.'
+    );
+  }
+
+  const response = await fetch(
+    'https://api.paystack.co' + endpoint,
+    {
+      ...options,
+      headers: {
+        Authorization: 'Bearer ' + secret,
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      }
+    }
+  );
+
+  let data;
+
+  try {
+    data = await response.json();
+  } catch (e) {
+    throw new Error(
+      'Paystack returned an invalid response.'
+    );
+  }
+
+  if (!response.ok || !data.status) {
+    throw new Error(
+      data.message || 'Paystack request failed.'
+    );
+  }
+
+  return data;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Find shipment
+|--------------------------------------------------------------------------
+*/
+
+async function findShipment(code) {
+  if (!code) return null;
+
+  if (LogisticsModel) {
+    try {
+      const doc = await LogisticsModel.findOne({
+        $or: [
+          { tracking: code },
+          { shipmentId: code },
+          { paymentReference: code },
+          { paystackReference: code }
+        ]
+      });
+
+      if (doc) return doc.toObject();
+    } catch (e) {
+      console.error(
+        'Logistics MongoDB lookup:',
+        e.message
+      );
+    }
+  }
+
+  return null;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Save shipment
+|--------------------------------------------------------------------------
+*/
+
+async function saveShipment(record) {
+  if (!LogisticsModel) {
+    throw new Error(
+      'Logistics database is not ready. Configure MONGODB_URI on Render.'
+    );
+  }
+
+  record.updatedAt = nowISO();
+
+  const saved = await LogisticsModel.findOneAndUpdate(
+    { tracking: record.tracking },
+    record,
+    {
+      upsert: true,
+      new: true,
+      setDefaultsOnInsert: true
+    }
+  );
+
+  return saved.toObject();
+}
+
+/*
+|--------------------------------------------------------------------------
+| Electronic approval
+|--------------------------------------------------------------------------
+*/
+
+function approvalMarkup(record) {
+  return `
+    <div style="
+      margin-top:20px;
+      border:1px solid #cbd5e1;
+      border-radius:12px;
+      padding:14px;
+      background:#f8fafc;
+    ">
+      <div style="
+        font-size:10px;
+        font-weight:900;
+        letter-spacing:1px;
+        color:#64748b;
+        text-transform:uppercase;
+      ">
+        Skylink Logistics Approval
+      </div>
+
+      <div style="
+        font-family:cursive;
+        font-size:26px;
+        font-style:italic;
+        font-weight:700;
+        color:#0f2e6d;
+        margin-top:5px;
+      ">
+        Skylink
+      </div>
+
+      <div style="
+        font-size:11px;
+        font-weight:800;
+        color:#166534;
+        margin-top:2px;
+      ">
+        ✓ Electronically Approved
+      </div>
+
+      <div style="
+        font-size:10px;
+        color:#64748b;
+        margin-top:5px;
+      ">
+        ${escapeHtml(record.approvedAt || '')}
+      </div>
+    </div>
+  `;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Customer Logistics Home
+|--------------------------------------------------------------------------
+*/
+
+function logisticsHome(req, res, airports) {
+  const locations = Array.isArray(airports)
+    ? airports
+    : [];
+
+  const locationJSON = JSON.stringify(
+    locations.map(a => ({
+      code: a.code,
+      city: a.city,
+      country: a.country,
+      name: a.name,
+      tz: a.tz,
+      lat: a.lat,
+      lon: a.lon
+    }))
+  );
+
+  res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport"
+      content="width=device-width,initial-scale=1">
+
+<title>Skylink Logistics</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:#f1f5f9;
+  font-family:Arial,Helvetica,sans-serif;
+  color:#0f172a;
+}
+
+.wrap{
+  width:100%;
+  min-height:100vh;
+  padding:14px;
+  display:flex;
+  justify-content:center;
+}
+
+.card{
+  width:100%;
+  max-width:620px;
+  background:#fff;
+  border:1px solid #e2e8f0;
+  border-radius:20px;
+  padding:24px;
+  box-shadow:0 10px 35px rgba(0,0,0,.08);
+}
+
+.logo{
+  text-align:center;
+  font-size:24px;
+  font-weight:900;
+  color:#0f2e6d;
+}
+
+.logo span{
+  color:#facc15;
+}
+
+.sub{
+  text-align:center;
+  color:#64748b;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.8px;
+  margin-top:5px;
+  margin-bottom:24px;
+}
+
+.section{
+  margin-top:22px;
+  padding-top:18px;
+  border-top:1px solid #e2e8f0;
+}
+
+h2{
+  font-size:16px;
+  margin:0 0 14px;
+}
+
+label{
+  display:block;
+  font-size:12px;
+  font-weight:900;
+  margin:14px 0 6px;
+}
+
+input,textarea{
+  width:100%;
+  border:1.5px solid #dbe3ec;
+  border-radius:11px;
+  padding:14px;
+  font-size:16px;
+  outline:none;
+  background:#f8fafc;
+}
+
+textarea{
+  min-height:80px;
+  resize:vertical;
+}
+
+input:focus,
+textarea:focus{
+  border-color:#0f2e6d;
+  background:#fff;
+}
+
+.location{
+  position:relative;
+}
+
+.suggestions{
+  display:none;
+  position:absolute;
+  left:0;
+  right:0;
+  top:100%;
+  background:#fff;
+  border:1px solid #dbe3ec;
+  border-radius:10px;
+  z-index:50;
+  max-height:200px;
+  overflow:auto;
+  box-shadow:0 10px 25px rgba(0,0,0,.1);
+}
+
+.suggestions div{
+  padding:12px;
+  border-bottom:1px solid #f1f5f9;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:700;
+}
+
+.price{
+  margin-top:20px;
+  padding:16px;
+  border-radius:12px;
+  background:#eff6ff;
+  border:1px solid #bfdbfe;
+  text-align:center;
+}
+
+.price small{
+  display:block;
+  color:#475569;
+  font-size:11px;
+  font-weight:800;
+}
+
+.price strong{
+  display:block;
+  margin-top:5px;
+  color:#0f2e6d;
+  font-size:25px;
+}
+
+.pay{
+  width:100%;
+  border:0;
+  border-radius:12px;
+  padding:16px;
+  margin-top:16px;
+  background:#0f2e6d;
+  color:#fff;
+  font-size:16px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.pay:disabled{
+  opacity:.55;
+}
+
+.notice{
+  margin-top:12px;
+  font-size:11px;
+  color:#64748b;
+  text-align:center;
+  line-height:1.5;
+}
+
+.trackBox{
+  margin-top:24px;
+  padding-top:20px;
+  border-top:1px solid #e2e8f0;
+}
+
+.trackRow{
+  display:flex;
+  gap:8px;
+}
+
+.trackRow input{
+  min-width:0;
+}
+
+.trackBtn{
+  border:0;
+  background:#16a34a;
+  color:#fff;
+  border-radius:10px;
+  padding:0 18px;
+  font-weight:900;
+}
+
+.msg{
+  margin-top:12px;
+  text-align:center;
+  font-size:12px;
+  font-weight:800;
+}
+
+@media(max-width:480px){
+  .card{
+    padding:18px;
+  }
+
+  .trackRow{
+    flex-direction:column;
+  }
+
+  .trackBtn{
+    min-height:48px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+<div class="card">
+
+<div class="logo">
+  SKYLINK <span>LOGISTICS</span>
+</div>
+
+<div class="sub">
+  SHIPMENT BOOKING & TRACKING
+</div>
+
+<form id="logisticsForm">
+
+<label>Customer Name *</label>
+<input
+  id="customerName"
+  required
+  maxlength="120"
+  placeholder="Full name">
+
+<label>Email *</label>
+<input
+  id="customerEmail"
+  type="email"
+  required
+  maxlength="160"
+  placeholder="Email address">
+
+<label>Phone *</label>
+<input
+  id="customerPhone"
+  required
+  maxlength="40"
+  placeholder="Phone number">
+
+<div class="section">
+
+<h2>Shipment Route</h2>
+
+<label>From *</label>
+
+<div class="location">
+<input
+  id="origin"
+  required
+  autocomplete="off"
+  placeholder="City / airport">
+
+<div
+  id="originSuggestions"
+  class="suggestions">
+</div>
+</div>
+
+<label>To *</label>
+
+<div class="location">
+<input
+  id="destination"
+  required
+  autocomplete="off"
+  placeholder="City / airport">
+
+<div
+  id="destinationSuggestions"
+  class="suggestions">
+</div>
+</div>
+
+<label>Origin Address</label>
+<textarea
+  id="originAddress"
+  maxlength="500"
+  placeholder="Pickup / origin address"></textarea>
+
+<label>Destination Address</label>
+<textarea
+  id="destinationAddress"
+  maxlength="500"
+  placeholder="Delivery / destination address"></textarea>
+
+</div>
+
+<div class="section">
+
+<h2>Package Information</h2>
+
+<label>Description *</label>
+<input
+  id="packageDescription"
+  required
+  maxlength="250"
+  placeholder="e.g. Documents, clothing, electronics">
+
+<label>Weight</label>
+<input
+  id="packageWeight"
+  maxlength="50"
+  placeholder="e.g. 2 KG">
+
+<label>Quantity</label>
+<input
+  id="packageQuantity"
+  maxlength="30"
+  placeholder="e.g. 1">
+
+</div>
+
+<div class="price">
+  <small>LOGISTICS SERVICE FEE</small>
+  <strong>NGN 3,000</strong>
+</div>
+
+<button
+  id="payButton"
+  class="pay"
+  type="submit">
+  Continue to Secure Payment
+</button>
+
+<div class="notice">
+  Payment is processed securely through Paystack.
+  The receipt generated after successful payment does not display
+  the service fee.
+</div>
+
+</form>
+
+<div class="trackBox">
+
+<h2>Track a Shipment</h2>
+
+<div class="trackRow">
+<input
+  id="trackingInput"
+  placeholder="SLK-XXXXXXXX">
+<button
+  class="trackBtn"
+  type="button"
+  onclick="trackShipment()">
+  Track
+</button>
+</div>
+
+<div
+  id="message"
+  class="msg">
+</div>
+
+</div>
+
+</div>
+</div>
+
+<script src="https://js.paystack.co/v1/inline.js"><\/script>
+
+<script>
+
+const locations = ${locationJSON};
+
+let selectedOrigin = null;
+let selectedDestination = null;
+let paymentReference = null;
+
+function setupLocation(inputId, boxId, setter){
+
+  const input = document.getElementById(inputId);
+  const box = document.getElementById(boxId);
+
+  input.addEventListener("input", function(){
+
+    const q = input.value.trim().toLowerCase();
+
+    selectedOrigin = inputId === "origin"
+      ? null
+      : selectedOrigin;
+
+    selectedDestination = inputId === "destination"
+      ? null
+      : selectedDestination;
+
+    if(!q){
+      box.style.display = "none";
+      return;
+    }
+
+    const results = locations
+      .filter(function(a){
+        return (
+          (a.code+" "+a.city+" "+a.country+" "+a.name)
+          .toLowerCase()
+          .includes(q)
+        );
+      })
+      .slice(0,10);
+
+    if(!results.length){
+      box.style.display = "none";
+      return;
+    }
+
+    box.innerHTML = results.map(function(a){
+
+      return '<div data-code="' +
+        a.code +
+        '">' +
+        '<b>' + a.code + '</b> - ' +
+        a.city + ', ' +
+        a.country +
+        ' - ' +
+        a.name +
+        '</div>';
+
+    }).join("");
+
+    box.style.display = "block";
+
+    box.querySelectorAll("div").forEach(function(el){
+
+      el.addEventListener("click", function(){
+
+        const a = locations.find(
+          function(x){
+            return x.code === el.dataset.code;
+          }
+        );
+
+        if(!a) return;
+
+        setter(a);
+
+        input.value =
+          a.code +
+          " - " +
+          a.city +
+          ", " +
+          a.country;
+
+        box.style.display = "none";
+      });
+
+    });
+
+  });
+}
+
+setupLocation(
+  "origin",
+  "originSuggestions",
+  function(a){
+    selectedOrigin = a;
+  }
+);
+
+setupLocation(
+  "destination",
+  "destinationSuggestions",
+  function(a){
+    selectedDestination = a;
+  }
+);
+
+function trackShipment(){
+
+  const code =
+    document.getElementById("trackingInput")
+    .value.trim();
+
+  if(!code){
+    document.getElementById("message").innerText =
+      "Enter your tracking number.";
+    return;
+  }
+
+  window.location.href =
+    "/logistics/track/" +
+    encodeURIComponent(code);
+}
+
+document
+  .getElementById("logisticsForm")
+  .addEventListener("submit", async function(e){
+
+    e.preventDefault();
+
+    const button =
+      document.getElementById("payButton");
+
+    if(!selectedOrigin || !selectedDestination){
+
+      document.getElementById("message").innerText =
+        "Please select a valid origin and destination.";
+
+      return;
+    }
+
+    if(
+      selectedOrigin.code ===
+      selectedDestination.code
+    ){
+
+      document.getElementById("message").innerText =
+        "Origin and destination cannot be the same.";
+
+      return;
+    }
+
+    button.disabled = true;
+    button.innerText =
+      "Preparing Secure Payment...";
+
+    const payload = {
+
+      customerName:
+        document.getElementById("customerName")
+        .value.trim(),
+
+      customerEmail:
+        document.getElementById("customerEmail")
+        .value.trim(),
+
+      customerPhone:
+        document.getElementById("customerPhone")
+        .value.trim(),
+
+      originCountry:
+        selectedOrigin.country,
+
+      originCity:
+        selectedOrigin.city,
+
+      originAddress:
+        document.getElementById("originAddress")
+        .value.trim(),
+
+      destinationCountry:
+        selectedDestination.country,
+
+      destinationCity:
+        selectedDestination.city,
+
+      destinationAddress:
+        document.getElementById("destinationAddress")
+        .value.trim(),
+
+      originLat:
+        selectedOrigin.lat,
+
+      originLon:
+        selectedOrigin.lon,
+
+      destinationLat:
+        selectedDestination.lat,
+
+      destinationLon:
+        selectedDestination.lon,
+
+      originTimezone:
+        selectedOrigin.tz,
+
+      destinationTimezone:
+        selectedDestination.tz,
+
+      packageDescription:
+        document.getElementById("packageDescription")
+        .value.trim(),
+
+      packageWeight:
+        document.getElementById("packageWeight")
+        .value.trim(),
+
+      packageQuantity:
+        document.getElementById("packageQuantity")
+        .value.trim()
+    };
+
+    try{
+
+      const response =
+        await fetch(
+          "/api/logistics/payment/initialize",
+          {
+            method:"POST",
+            headers:{
+              "Content-Type":"application/json"
+            },
+            body:JSON.stringify(payload)
+          }
+        );
+
+      const data = await response.json();
+
+      if(!response.ok || !data.status){
+
+        throw new Error(
+          data.error ||
+          "Unable to initialize payment."
+        );
+      }
+
+      paymentReference =
+        data.reference;
+
+      if(
+        typeof PaystackPop ===
+        "undefined"
+      ){
+
+        throw new Error(
+          "Paystack checkout failed to load."
+        );
+      }
+
+      const handler =
+        PaystackPop.setup({
+
+          key:
+            data.publicKey,
+
+          email:
+            payload.customerEmail,
+
+          amount:
+            data.amount,
+
+          currency:"NGN",
+
+          ref:
+            data.reference,
+
+          callback:
+            function(response){
+
+              verifyPayment(
+                response.reference,
+                button
+              );
+
+            },
+
+          onClose:
+            function(){
+
+              button.disabled = false;
+
+              button.innerText =
+                "Continue to Secure Payment";
+
+            }
+
+        });
+
+      handler.openIframe();
+
+    }catch(err){
+
+      button.disabled = false;
+
+      button.innerText =
+        "Continue to Secure Payment";
+
+      document.getElementById("message")
+        .innerText =
+        err.message ||
+        "Payment initialization failed.";
+
+    }
+
+  });
+
+async function verifyPayment(reference, button){
+
+  button.disabled = true;
+  button.innerText =
+    "Verifying Payment...";
+
+  try{
+
+    const response =
+      await fetch(
+        "/api/logistics/payment/verify",
+        {
+          method:"POST",
+          headers:{
+            "Content-Type":"application/json"
+          },
+          body:JSON.stringify({
+            reference:reference
+          })
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if(
+      !response.ok ||
+      !data.status ||
+      !data.receiptUrl
+    ){
+
+      throw new Error(
+        data.error ||
+        "Payment verification failed."
+      );
+
+    }
+
+    window.location.href =
+      data.receiptUrl;
+
+  }catch(err){
+
+    button.disabled = false;
+
+    button.innerText =
+      "Continue to Secure Payment";
+
+    document.getElementById("message")
+      .innerText =
+      err.message ||
+      "Unable to verify payment.";
+
+  }
+
+}
+
+document.addEventListener(
+  "click",
+  function(e){
+
+    if(!e.target.closest(".location")){
+
+      document
+        .querySelectorAll(".suggestions")
+        .forEach(function(x){
+          x.style.display = "none";
+        });
+
+    }
+
+  }
+);
+
+<\/script>
+
+</body>
+</html>
+`);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Payment initialization
+|--------------------------------------------------------------------------
+*/
+
+async function initializePayment(req, res) {
+
+  try {
+
+    const body = req.body || {};
+
+    const customerName =
+      clean(body.customerName, 120);
+
+    const customerEmail =
+      clean(body.customerEmail, 160);
+
+    const customerPhone =
+      clean(body.customerPhone, 40);
+
+    const originCountry =
+      clean(body.originCountry, 100);
+
+    const originCity =
+      clean(body.originCity, 100);
+
+    const destinationCountry =
+      clean(body.destinationCountry, 100);
+
+    const destinationCity =
+      clean(body.destinationCity, 100);
+
+    const packageDescription =
+      clean(body.packageDescription, 250);
+
+    if(
+      !customerName ||
+      !customerEmail ||
+      !customerPhone ||
+      !originCountry ||
+      !originCity ||
+      !destinationCountry ||
+      !destinationCity ||
+      !packageDescription
+    ) {
+
+      return res.status(400).json({
+        status:false,
+        error:"Please complete all required shipment fields."
+      });
+
+    }
+
+    if(
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        customerEmail
+      )
+    ){
+
+      return res.status(400).json({
+        status:false,
+        error:"Please enter a valid email address."
+      });
+
+    }
+
+    if(!LogisticsModel){
+
+      return res.status(503).json({
+        status:false,
+        error:
+          "Logistics database is not available. Configure MONGODB_URI on Render."
+      });
+
+    }
+
+    const shipmentId =
+      makeShipmentId();
+
+    const tracking =
+      makeTrackingCode();
+
+    const reference =
+      makeReference();
+
+    const originLat =
+      Number(body.originLat);
+
+    const originLon =
+      Number(body.originLon);
+
+    const destinationLat =
+      Number(body.destinationLat);
+
+    const destinationLon =
+      Number(body.destinationLon);
+
+    let distanceKm = 0;
+
+    if(
+      Number.isFinite(originLat) &&
+      Number.isFinite(originLon) &&
+      Number.isFinite(destinationLat) &&
+      Number.isFinite(destinationLon)
+    ){
+
+      distanceKm =
+        haversine(
+          originLat,
+          originLon,
+          destinationLat,
+          destinationLon
+        );
+
+    }
+
+    const record = {
+
+      shipmentId,
+
+      tracking,
+
+      paymentReference:reference,
+
+      customerName,
+
+      customerEmail,
+
+      customerPhone,
+
+      originCountry,
+
+      originCity,
+
+      originAddress:
+        clean(body.originAddress, 500),
+
+      destinationCountry,
+
+      destinationCity,
+
+      destinationAddress:
+        clean(body.destinationAddress, 500),
+
+      originLat:
+        Number.isFinite(originLat)
+          ? originLat
+          : null,
+
+      originLon:
+        Number.isFinite(originLon)
+          ? originLon
+          : null,
+
+      destinationLat:
+        Number.isFinite(destinationLat)
+          ? destinationLat
+          : null,
+
+      destinationLon:
+        Number.isFinite(destinationLon)
+          ? destinationLon
+          : null,
+
+      originTimezone:
+        clean(body.originTimezone, 100) ||
+        "UTC",
+
+      destinationTimezone:
+        clean(body.destinationTimezone, 100) ||
+        "UTC",
+
+      distanceKm,
+
+      packageDescription,
+
+      packageWeight:
+        clean(body.packageWeight, 50),
+
+      packageQuantity:
+        clean(body.packageQuantity, 30),
+
+      status:"Payment Pending",
+
+      paymentStatus:"pending",
+
+      paymentVerified:false,
+
+      currency:"NGN",
+
+      amountKobo:
+        LOGISTICS_AMOUNT_KOBO,
+
+      paystackReference:
+        reference,
+
+      createdAt:
+        nowISO(),
+
+      paidAt:null,
+
+      updatedAt:
+        nowISO(),
+
+      approvedAt:null,
+
+      approvalText:
+        "Electronically approved by Skylink Logistics"
+    };
+
+    await saveShipment(record);
+
+    const paystack =
+      await paystackRequest(
+        "/transaction/initialize",
+        {
+          method:"POST",
+          body:JSON.stringify({
+
+            email:
+              customerEmail,
+
+            amount:
+              LOGISTICS_AMOUNT_KOBO,
+
+            currency:"NGN",
+
+            reference,
+
+            callback_url:
+              baseUrl(req) +
+              "/logistics/payment/callback",
+
+            metadata:{
+              service:"SKYLINK LOGISTICS",
+              shipment_id:shipmentId,
+              tracking_code:tracking
+            }
+
+          })
+        }
+      );
+
+    return res.json({
+
+      status:true,
+
+      publicKey:
+        process.env.PAYSTACK_PUBLIC_KEY || "",
+
+      reference,
+
+      accessCode:
+        paystack.data &&
+        paystack.data.access_code,
+
+      authorizationUrl:
+        paystack.data &&
+        paystack.data.authorization_url,
+
+      amount:
+        LOGISTICS_AMOUNT_KOBO,
+
+      shipmentId,
+
+      tracking
+
+    });
+
+  } catch(err){
+
+    console.error(
+      "LOGISTICS PAYMENT INITIALIZE:",
+      err
+    );
+
+    return res.status(500).json({
+
+      status:false,
+
+      error:
+        err.message ||
+        "Unable to initialize Logistics payment."
+
+    });
+
+  }
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Verify payment
+|--------------------------------------------------------------------------
+*/
+
+async function verifyPayment(req, res){
+
+  try{
+
+    const reference =
+      clean(
+        req.body &&
+        req.body.reference,
+        150
+      );
+
+    if(!reference){
+
+      return res.status(400).json({
+
+        status:false,
+
+        error:"Payment reference is required."
+
+      });
+
+    }
+
+    const paystack =
+      await paystackRequest(
+        "/transaction/verify/" +
+        encodeURIComponent(reference),
+        {
+          method:"GET"
+        }
+      );
+
+    const transaction =
+      paystack.data;
+
+    if(!transaction){
+
+      return res.status(400).json({
+
+        status:false,
+
+        error:"Paystack transaction not found."
+
+      });
+
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CRITICAL PAYMENT CHECKS
+    |--------------------------------------------------------------------------
+    */
+
+    if(transaction.status !== "success"){
+
+      return res.status(400).json({
+
+        status:false,
+
+        error:
+          "Payment has not been confirmed as successful."
+
+      });
+
+    }
+
+    if(
+      Number(transaction.amount) !==
+      LOGISTICS_AMOUNT_KOBO
+    ){
+
+      return res.status(400).json({
+
+        status:false,
+
+        error:
+          "Payment amount does not match the required Logistics fee."
+
+      });
+
+    }
+
+    if(
+      String(transaction.currency || "")
+        .toUpperCase() !== "NGN"
+    ){
+
+      return res.status(400).json({
+
+        status:false,
+
+        error:
+          "Invalid payment currency."
+
+      });
+
+    }
+
+    const record =
+      await findShipment(reference);
+
+    if(!record){
+
+      return res.status(404).json({
+
+        status:false,
+
+        error:
+          "Logistics shipment associated with this payment was not found."
+
+      });
+
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Prevent duplicate fulfillment
+    |--------------------------------------------------------------------------
+    */
+
+    if(record.paymentVerified){
+
+      return res.json({
+
+        status:true,
+
+        alreadyProcessed:true,
+
+        tracking:
+          record.tracking,
+
+        receiptUrl:
+          "/logistics/receipt/" +
+          encodeURIComponent(
+            record.tracking
+          )
+
+      });
+
+    }
+
+    record.paymentStatus =
+      "success";
+
+    record.paymentVerified =
+      true;
+
+    record.paystackReference =
+      reference;
+
+    record.paidAt =
+      nowISO();
+
+    record.approvedAt =
+      nowISO();
+
+    record.status =
+      "Shipment Booked";
+
+    record.approvalText =
+      "Electronically approved by Skylink Logistics";
+
+    await saveShipment(record);
+
+    return res.json({
+
+      status:true,
+
+      tracking:
+        record.tracking,
+
+      shipmentId:
+        record.shipmentId,
+
+      receiptUrl:
+        "/logistics/receipt/" +
+        encodeURIComponent(
+          record.tracking
+        )
+
+    });
+
+  } catch(err){
+
+    console.error(
+      "LOGISTICS PAYMENT VERIFY:",
+      err
+    );
+
+    return res.status(500).json({
+
+      status:false,
+
+      error:
+        err.message ||
+        "Payment verification failed."
+
+    });
+
+  }
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Paystack Webhook
+|--------------------------------------------------------------------------
+*/
+
+async function webhook(req, res){
+
+  try{
+
+    const secret =
+      getPaystackSecret();
+
+    if(!secret){
+
+      return res
+        .status(500)
+        .send("Webhook secret not configured.");
+
+    }
+
+    const signature =
+      req.headers[
+        "x-paystack-signature"
+      ];
+
+    if(!signature){
+
+      return res
+        .status(401)
+        .send("Missing signature.");
+
+    }
+
+    const rawBody =
+      JSON.stringify(req.body);
+
+    const expected =
+      crypto
+        .createHmac(
+          "sha512",
+          secret
+        )
+        .update(rawBody)
+        .digest("hex");
+
+    if(
+      !crypto.timingSafeEqual(
+        Buffer.from(signature),
+        Buffer.from(expected)
+      )
+    ){
+
+      return res
+        .status(401)
+        .send("Invalid signature.");
+
+    }
+
+    const event =
+      req.body || {};
+
+    if(
+      event.event !==
+      "charge.success"
+    ){
+
+      return res.send("OK");
+
+    }
+
+    const transaction =
+      event.data || {};
+
+    const reference =
+      transaction.reference;
+
+    if(!reference){
+
+      return res.send("OK");
+
+    }
+
+    if(
+      transaction.status !==
+      "success"
+    ){
+
+      return res.send("OK");
+
+    }
+
+    if(
+      Number(transaction.amount) !==
+      LOGISTICS_AMOUNT_KOBO
+    ){
+
+      console.log(
+        "LOGISTICS WEBHOOK amount mismatch:",
+        reference
+      );
+
+      return res.send("OK");
+
+    }
+
+    if(
+      String(transaction.currency || "")
+        .toUpperCase() !== "NGN"
+    ){
+
+      return res.send("OK");
+
+    }
+
+    const record =
+      await findShipment(reference);
+
+    if(!record){
+
+      console.log(
+        "Logistics webhook shipment not found:",
+        reference
+      );
+
+      return res.send("OK");
+
+    }
+
+    if(!record.paymentVerified){
+
+      record.paymentStatus =
+        "success";
+
+      record.paymentVerified =
+        true;
+
+      record.paystackReference =
+        reference;
+
+      record.paidAt =
+        nowISO();
+
+      record.approvedAt =
+        nowISO();
+
+      record.status =
+        "Shipment Booked";
+
+      await saveShipment(record);
+
+    }
+
+    return res.send("OK");
+
+  } catch(err){
+
+    console.error(
+      "LOGISTICS WEBHOOK:",
+      err
+    );
+
+    return res
+      .status(500)
+      .send("Webhook processing error.");
+
+  }
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Receipt
+|--------------------------------------------------------------------------
+*/
+
+async function receipt(req, res){
+
+  const code =
+    clean(req.params.code, 150);
+
+  const record =
+    await findShipment(code);
+
+  if(!record){
+
+    return res.status(404).send(
+      notFoundPage(
+        "Logistics Receipt Not Found"
+      )
+    );
+
+  }
+
+  if(!record.paymentVerified){
+
+    return res.status(403).send(
+      notFoundPage(
+        "Receipt Available After Confirmed Payment"
+      )
+    );
+
+  }
+
+  const link =
+    trackingUrl(
+      req,
+      record.tracking
+    );
+
+  let qr = "";
+
+  if(QRCode){
+
+    try{
+
+      qr =
+        await QRCode.toDataURL(
+          link,
+          {
+            width:220,
+            margin:2,
+            errorCorrectionLevel:"H"
+          }
+        );
+
+    }catch(e){
+
+      console.error(
+        "QR generation:",
+        e
+      );
+
+    }
+
+  }
+
+  const originTime =
+    formatDate(
+      record.createdAt,
+      record.originTimezone
+    );
+
+  const trackingTime =
+    formatDate(
+      record.createdAt,
+      record.destinationTimezone
+    );
+
+  const qrHtml =
+    qr
+      ? `<img src="${qr}"
+              alt="Shipment tracking barcode"
+              style="width:210px;height:210px;display:block;margin:auto">`
+      : `
+        <div style="
+          width:210px;
+          height:210px;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          border:1px solid #ddd;
+          margin:auto;
+          font-weight:800;
+        ">
+          TRACKING QR
+        </div>
+      `;
+
+  /*
+  IMPORTANT:
+  The NGN 3,000 amount is deliberately NOT printed anywhere
+  in this receipt.
+  */
+
+  res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8">
+
+<meta
+ name="viewport"
+ content="width=device-width,initial-scale=1">
+
+<title>
+Skylink Logistics Receipt ${escapeHtml(record.tracking)}
+</title>
+
+<style>
+
+*{
+ box-sizing:border-box;
+}
+
+body{
+ margin:0;
+ background:#eef2f7;
+ font-family:Arial,Helvetica,sans-serif;
+ color:#111827;
+}
+
+.page{
+ width:100%;
+ min-height:100vh;
+ padding:14px;
+ display:flex;
+ justify-content:center;
+}
+
+.receipt{
+ width:100%;
+ max-width:760px;
+ background:#fff;
+ border:1px solid #dbe3ec;
+ border-radius:18px;
+ overflow:hidden;
+ box-shadow:0 10px 35px rgba(0,0,0,.08);
+}
+
+.header{
+ background:#0f2e6d;
+ color:#fff;
+ padding:22px;
+ display:flex;
+ justify-content:space-between;
+ gap:20px;
+ align-items:center;
+}
+
+.logo{
+ font-size:23px;
+ font-weight:900;
+}
+
+.logo span{
+ color:#facc15;
+}
+
+.headerSmall{
+ font-size:9px;
+ opacity:.85;
+ margin-top:5px;
+ letter-spacing:.6px;
+}
+
+.approved{
+ background:#dcfce7;
+ color:#166534;
+ padding:8px 12px;
+ border-radius:20px;
+ font-size:10px;
+ font-weight:900;
+ white-space:nowrap;
+}
+
+.body{
+ padding:22px;
+}
+
+.receiptTitle{
+ font-size:19px;
+ font-weight:900;
+ margin-bottom:18px;
+}
+
+.grid{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:12px;
+}
+
+.item{
+ border:1px solid #e2e8f0;
+ border-radius:11px;
+ padding:12px;
+}
+
+.label{
+ font-size:9px;
+ font-weight:900;
+ color:#64748b;
+ text-transform:uppercase;
+ letter-spacing:.5px;
+}
+
+.value{
+ font-size:13px;
+ font-weight:800;
+ margin-top:5px;
+ line-height:1.4;
+ word-break:break-word;
+}
+
+.route{
+ margin-top:15px;
+ border:1px solid #dbeafe;
+ background:#eff6ff;
+ border-radius:12px;
+ padding:15px;
+}
+
+.routeLine{
+ font-size:16px;
+ font-weight:900;
+ color:#0f2e6d;
+}
+
+.qrSection{
+ margin-top:20px;
+ border-top:1px dashed #cbd5e1;
+ padding-top:20px;
+ text-align:center;
+}
+
+.scanText{
+ margin-top:8px;
+ font-size:11px;
+ font-weight:900;
+ color:#0f2e6d;
+}
+
+.scanSub{
+ margin-top:4px;
+ font-size:10px;
+ color:#64748b;
+}
+
+.actions{
+ display:flex;
+ flex-wrap:wrap;
+ gap:8px;
+ margin-top:20px;
+}
+
+button{
+ border:0;
+ border-radius:9px;
+ padding:12px 15px;
+ font-size:12px;
+ font-weight:900;
+ cursor:pointer;
+}
+
+.download{
+ background:#16a34a;
+ color:#fff;
+}
+
+.copy{
+ background:#0f2e6d;
+ color:#fff;
+}
+
+.track{
+ background:#fff;
+ color:#0f2e6d;
+ border:1.5px solid #0f2e6d;
+}
+
+.approval{
+ margin-top:20px;
+}
+
+.footer{
+ background:#0f2e6d;
+ color:#cbd5e1;
+ padding:12px;
+ text-align:center;
+ font-size:9px;
+ line-height:1.5;
+}
+
+.message{
+ text-align:center;
+ color:#16a34a;
+ font-size:11px;
+ font-weight:800;
+ margin-top:8px;
+ display:none;
+}
+
+@media(max-width:600px){
+
+ .header{
+   flex-direction:column;
+   align-items:flex-start;
+ }
+
+ .grid{
+   grid-template-columns:1fr;
+ }
+
+ .actions button{
+   width:100%;
+ }
+
+}
+
+@media print{
+
+ body{
+   background:#fff;
+ }
+
+ .page{
+   padding:0;
+ }
+
+ .receipt{
+   box-shadow:none;
+   border:0;
+ }
+
+ .actions,
+ .message{
+   display:none !important;
+ }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="page">
+
+<div class="receipt" id="receipt">
+
+<div class="header">
+
+<div>
+
+<div class="logo">
+SKYLINK <span>LOGISTICS</span>
+</div>
+
+<div class="headerSmall">
+OFFICIAL SHIPMENT RECEIPT
+</div>
+
+</div>
+
+<div class="approved">
+✓ PAYMENT VERIFIED
+</div>
+
+</div>
+
+<div class="body">
+
+<div class="receiptTitle">
+Shipment Receipt
+</div>
+
+<div class="grid">
+
+<div class="item">
+<div class="label">Shipment ID</div>
+<div class="value">
+${escapeHtml(record.shipmentId)}
+</div>
+</div>
+
+<div class="item">
+<div class="label">Tracking Number</div>
+<div class="value">
+${escapeHtml(record.tracking)}
+</div>
+</div>
+
+<div class="item">
+<div class="label">Customer</div>
+<div class="value">
+${escapeHtml(record.customerName)}
+</div>
+</div>
+
+<div class="item">
+<div class="label">Phone</div>
+<div class="value">
+${escapeHtml(record.customerPhone)}
+</div>
+</div>
+
+<div class="item">
+<div class="label">Email</div>
+<div class="value">
+${escapeHtml(record.customerEmail)}
+</div>
+</div>
+
+<div class="item">
+<div class="label">Shipment Status</div>
+<div class="value" style="color:#16a34a">
+${escapeHtml(record.status)}
+</div>
+</div>
+
+</div>
+
+<div class="route">
+
+<div class="label">
+Shipment Route
+</div>
+
+<div class="routeLine">
+${escapeHtml(record.originCity)},
+${escapeHtml(record.originCountry)}
+&nbsp; → &nbsp;
+${escapeHtml(record.destinationCity)},
+${escapeHtml(record.destinationCountry)}
+</div>
+
+<div style="
+ margin-top:8px;
+ font-size:11px;
+ color:#64748b;
+">
+Distance:
+${escapeHtml(record.distanceKm || 0)} km
+</div>
+
+</div>
+
+<div class="grid" style="margin-top:15px">
+
+<div class="item">
+<div class="label">Package</div>
+<div class="value">
+${escapeHtml(record.packageDescription)}
+</div>
+</div>
+
+<div class="item">
+<div class="label">Weight</div>
+<div class="value">
+${escapeHtml(record.packageWeight || "Not specified")}
+</div>
+</div>
+
+<div class="item">
+<div class="label">Quantity</div>
+<div class="value">
+${escapeHtml(record.packageQuantity || "Not specified")}
+</div>
+</div>
+
+<div class="item">
+<div class="label">Issued</div>
+<div class="value">
+${escapeHtml(originTime)}
+</div>
+</div>
+
+</div>
+
+<div class="qrSection">
+
+${qrHtml}
+
+<div class="scanText">
+SCAN TO TRACK THIS SHIPMENT
+</div>
+
+<div class="scanSub">
+Scanning this code opens the shipment tracking page.
+</div>
+
+</div>
+
+<div class="approval">
+
+${approvalMarkup(record)}
+
+</div>
+
+<div class="actions">
+
+<button
+ class="download"
+ onclick="downloadReceipt()">
+ Download Receipt
+</button>
+
+<button
+ class="copy"
+ onclick="copyTracking()">
+ Copy Tracking Link
+</button>
+
+<button
+ class="track"
+ onclick="openTracking()">
+ Track Shipment
+</button>
+
+</div>
+
+<div
+ id="message"
+ class="message">
+</div>
+
+</div>
+
+<div class="footer">
+Skylink Logistics • Shipment document •
+Electronically approved by Skylink Logistics
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+const trackingLink =
+${JSON.stringify(link)};
+
+function showMessage(text){
+
+ const el =
+   document.getElementById("message");
+
+ el.innerText = text;
+ el.style.display = "block";
+
+ setTimeout(function(){
+   el.style.display = "none";
+ },4000);
+
+}
+
+async function copyTracking(){
+
+ try{
+
+   if(
+     navigator.clipboard &&
+     window.isSecureContext
+   ){
+
+     await navigator.clipboard
+       .writeText(trackingLink);
+
+     showMessage(
+       "Tracking link copied: " +
+       trackingLink
+     );
+
+     return;
+   }
+
+ }catch(e){}
+
+ const textarea =
+   document.createElement("textarea");
+
+ textarea.value =
+   trackingLink;
+
+ textarea.style.position =
+   "fixed";
+
+ textarea.style.left =
+   "-9999px";
+
+ document.body.appendChild(
+   textarea
+ );
+
+ textarea.select();
+
+ try{
+   document.execCommand("copy");
+ }catch(e){}
+
+ textarea.remove();
+
+ showMessage(
+   "Tracking link copied: " +
+   trackingLink
+ );
+
+}
+
+function openTracking(){
+
+ window.location.href =
+   trackingLink;
+
+}
+
+function downloadReceipt(){
+
+ /*
+  The downloaded document contains no service price.
+  It opens as a standalone HTML receipt that can be
+  saved on the phone.
+ */
+
+ const receipt =
+   document.getElementById("receipt");
+
+ const clone =
+   receipt.cloneNode(true);
+
+ clone
+   .querySelectorAll(".actions,.message")
+   .forEach(function(x){
+     x.remove();
+   });
+
+ const html =
+ '<!DOCTYPE html>' +
+ '<html><head>' +
+ '<meta charset="utf-8">' +
+ '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+ '<title>Skylink Logistics Receipt</title>' +
+ '<style>' +
+ 'body{font-family:Arial;margin:20px;background:#fff;color:#111827}' +
+ '.receipt{max-width:760px;margin:auto;border:1px solid #ddd;border-radius:15px;overflow:hidden}' +
+ '.header{background:#0f2e6d;color:white;padding:20px}' +
+ '.logo{font-size:22px;font-weight:900}' +
+ '.logo span{color:#facc15}' +
+ '.body{padding:20px}' +
+ '.item{border:1px solid #ddd;padding:12px;margin-bottom:10px;border-radius:8px}' +
+ '.label{font-size:9px;font-weight:900;color:#64748b}' +
+ '.value{font-size:13px;font-weight:800;margin-top:4px}' +
+ '</style>' +
+ '</head><body>' +
+ clone.outerHTML +
+ '</body></html>';
+
+ const blob =
+   new Blob(
+     [html],
+     {type:"text/html"}
+   );
+
+ const url =
+   URL.createObjectURL(blob);
+
+ const a =
+   document.createElement("a");
+
+ a.href = url;
+
+ a.download =
+   "Skylink-Logistics-" +
+   ${JSON.stringify(record.tracking)} +
+   "-Receipt.html";
+
+ document.body.appendChild(a);
+
+ a.click();
+
+ a.remove();
+
+ setTimeout(function(){
+   URL.revokeObjectURL(url);
+ },1000);
+
+ showMessage(
+   "Receipt saved."
+ );
+
+}
+
+<\/script>
+
+</body>
+</html>
+`);
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Dedicated tracking page
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+| No receipt link.
+| No main-site link.
+| No Airlines link.
+|
+*/
+
+async function trackingPage(req, res){
+
+  const code =
+    clean(req.params.code, 150);
+
+  const record =
+    await findShipment(code);
+
+  if(!record){
+
+    return res.status(404).send(
+      notFoundPage(
+        "Shipment Not Found"
+      )
+    );
+
+  }
+
+  const hasMap =
+    Number.isFinite(
+      Number(record.originLat)
+    ) &&
+    Number.isFinite(
+      Number(record.originLon)
+    ) &&
+    Number.isFinite(
+      Number(record.destinationLat)
+    ) &&
+    Number.isFinite(
+      Number(record.destinationLon)
+    );
+
+  const mapHTML = hasMap
+    ? `
+<link
+ rel="stylesheet"
+ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<div class="mapTitle">
+Shipment Route
+</div>
+
+<div id="map"></div>
+
+<script
+ src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+<\/script>
+
+<script>
+
+const fromLat =
+ ${Number(record.originLat)};
+
+const fromLon =
+ ${Number(record.originLon)};
+
+const toLat =
+ ${Number(record.destinationLat)};
+
+const toLon =
+ ${Number(record.destinationLon)};
+
+const map =
+ L.map("map");
+
+L.tileLayer(
+ "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+ {
+   maxZoom:18,
+   attribution:"© OpenStreetMap"
+ }
+).addTo(map);
+
+const line =
+ L.polyline(
+   [
+     [fromLat,fromLon],
+     [toLat,toLon]
+   ],
+   {
+     weight:4,
+     dashArray:"7,8"
+   }
+).addTo(map);
+
+L.marker(
+ [fromLat,fromLon]
+).addTo(map)
+.bindPopup(
+ ${JSON.stringify(
+   record.originCity +
+   ", " +
+   record.originCountry
+ )}
+);
+
+L.marker(
+ [toLat,toLon]
+).addTo(map)
+.bindPopup(
+ ${JSON.stringify(
+   record.destinationCity +
+   ", " +
+   record.destinationCountry
+ )}
+);
+
+map.fitBounds(
+ line.getBounds(),
+ {
+   padding:[30,30]
+ }
+);
+
+<\/script>
+`
+    : `
+<div class="noMap">
+Route map coordinates are currently unavailable.
+</div>
+`;
+
+  const originTime =
+    formatDate(
+      record.createdAt,
+      record.originTimezone
+    );
+
+  const destinationTime =
+    formatDate(
+      record.createdAt,
+      record.destinationTimezone
+    );
+
+  res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8">
+
+<meta
+ name="viewport"
+ content="width=device-width,initial-scale=1">
+
+<title>
+Skylink Logistics Tracking
+</title>
+
+<style>
+
+*{
+ box-sizing:border-box;
+}
+
+body{
+ margin:0;
+ background:#fff;
+ font-family:Arial,Helvetica,sans-serif;
+ color:#111827;
+}
+
+.container{
+ width:100%;
+ max-width:800px;
+ margin:auto;
+ padding:16px;
+}
+
+.header{
+ border-bottom:2px solid #0f2e6d;
+ padding:10px 0 16px;
+}
+
+.logo{
+ font-size:22px;
+ font-weight:900;
+ color:#0f2e6d;
+}
+
+.logo span{
+ color:#facc15;
+}
+
+.sub{
+ font-size:10px;
+ color:#64748b;
+ margin-top:5px;
+ font-weight:800;
+ letter-spacing:.5px;
+}
+
+.tracking{
+ margin-top:18px;
+ font-size:13px;
+ font-weight:900;
+}
+
+.trackingCode{
+ margin-top:5px;
+ font-size:22px;
+ font-weight:900;
+ color:#0f2e6d;
+ word-break:break-word;
+}
+
+.status{
+ display:inline-block;
+ margin-top:14px;
+ padding:8px 12px;
+ border-radius:20px;
+ background:#dcfce7;
+ color:#166534;
+ font-size:11px;
+ font-weight:900;
+}
+
+.grid{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:12px;
+ margin-top:20px;
+}
+
+.card{
+ border:1px solid #e2e8f0;
+ border-radius:12px;
+ padding:14px;
+}
+
+.label{
+ font-size:9px;
+ color:#64748b;
+ font-weight:900;
+ text-transform:uppercase;
+ letter-spacing:.5px;
+}
+
+.value{
+ font-size:13px;
+ font-weight:800;
+ margin-top:5px;
+ line-height:1.4;
+ word-break:break-word;
+}
+
+.mapTitle{
+ margin-top:20px;
+ font-size:14px;
+ font-weight:900;
+}
+
+#map{
+ width:100%;
+ height:400px;
+ margin-top:10px;
+ border-radius:14px;
+ border:1px solid #dbe3ec;
+}
+
+.noMap{
+ margin-top:18px;
+ padding:20px;
+ background:#f8fafc;
+ border-radius:12px;
+ text-align:center;
+ color:#64748b;
+ font-size:12px;
+}
+
+.footer{
+ margin-top:20px;
+ padding-top:15px;
+ border-top:1px solid #e2e8f0;
+ text-align:center;
+ color:#94a3b8;
+ font-size:9px;
+}
+
+@media(max-width:600px){
+
+ .grid{
+   grid-template-columns:1fr;
+ }
+
+ #map{
+   height:330px;
+ }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="header">
+
+<div class="logo">
+SKYLINK <span>LOGISTICS</span>
+</div>
+
+<div class="sub">
+SHIPMENT TRACKING
+</div>
+
+</div>
+
+<div class="tracking">
+TRACKING NUMBER
+</div>
+
+<div class="trackingCode">
+${escapeHtml(record.tracking)}
+</div>
+
+<div class="status">
+${escapeHtml(record.status)}
+</div>
+
+<div class="grid">
+
+<div class="card">
+
+<div class="label">
+From
+</div>
+
+<div class="value">
+${escapeHtml(record.originCity)},
+${escapeHtml(record.originCountry)}
+</div>
+
+<div class="value"
+ style="font-size:11px;color:#64748b">
+${escapeHtml(record.originAddress || "Address not provided")}
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="label">
+To
+</div>
+
+<div class="value">
+${escapeHtml(record.destinationCity)},
+${escapeHtml(record.destinationCountry)}
+</div>
+
+<div class="value"
+ style="font-size:11px;color:#64748b">
+${escapeHtml(record.destinationAddress || "Address not provided")}
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="label">
+Distance
+</div>
+
+<div class="value">
+${escapeHtml(record.distanceKm || 0)} km
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="label">
+Shipment
+</div>
+
+<div class="value">
+${escapeHtml(record.packageDescription)}
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="label">
+Origin Local Time
+</div>
+
+<div class="value">
+${escapeHtml(originTime)}
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="label">
+Destination Local Time
+</div>
+
+<div class="value">
+${escapeHtml(destinationTime)}
+</div>
+
+</div>
+
+</div>
+
+${mapHTML}
+
+<div class="footer">
+Skylink Logistics Shipment Tracking
+</div>
+
+</div>
+
+</body>
+</html>
+`);
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Not found page
+|--------------------------------------------------------------------------
+*/
+
+function notFoundPage(title){
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta
+ name="viewport"
+ content="width=device-width,initial-scale=1">
+
+<title>${escapeHtml(title)}</title>
+
+</head>
+
+<body style="
+margin:0;
+padding:40px 20px;
+font-family:Arial;
+text-align:center;
+background:#f8fafc;
+">
+
+<div style="
+max-width:500px;
+margin:auto;
+background:#fff;
+padding:30px;
+border-radius:15px;
+border:1px solid #e2e8f0;
+">
+
+<h2 style="color:#0f2e6d">
+${escapeHtml(title)}
+</h2>
+
+<p style="color:#64748b">
+The requested Logistics record could not be found.
+</p>
+
+</div>
+
+</body>
+</html>
+`;
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Admin Logistics Dashboard
+|--------------------------------------------------------------------------
+*/
+
+async function adminDashboard(req, res){
+
+  const authenticated =
+    typeof req.isAuthenticated === "function"
+      ? req.isAuthenticated()
+      : false;
+
+  if(!authenticated){
+
+    return res.redirect(
+      "/skylink-admin-login"
+    );
+
+  }
+
+  let records = [];
+
+  if(LogisticsModel){
+
+    try{
+
+      records =
+        await LogisticsModel
+          .find({})
+          .sort({
+            createdAt:-1
+          })
+          .lean();
+
+    }catch(e){
+
+      console.error(
+        "Logistics admin query:",
+        e.message
+      );
+
+    }
+
+  }
+
+  const total =
+    records.length;
+
+  const paid =
+    records.filter(
+      x => x.paymentVerified
+    ).length;
+
+  const today =
+    records.filter(
+      x =>
+        x.createdAt &&
+        new Date(
+          x.createdAt
+        ).toDateString() ===
+        new Date().toDateString()
+    ).length;
+
+  const rows =
+    records.map(
+      function(b){
+
+        return `
+<tr>
+
+<td>
+${escapeHtml(b.shipmentId)}
+</td>
+
+<td>
+<strong>
+${escapeHtml(b.tracking)}
+</strong>
+</td>
+
+<td>
+${escapeHtml(b.customerName)}
+<br>
+<span style="font-size:10px;color:#64748b">
+${escapeHtml(b.customerEmail)}
+</span>
+</td>
+
+<td>
+${escapeHtml(b.originCity)}
+ →
+${escapeHtml(b.destinationCity)}
+
+<br>
+
+<span style="
+font-size:10px;
+color:#64748b;
+">
+${escapeHtml(
+  b.distanceKm || 0
+)} km
+</span>
+
+</td>
+
+<td>
+<span style="
+background:#dcfce7;
+color:#166534;
+padding:5px 8px;
+border-radius:15px;
+font-size:10px;
+font-weight:900;
+">
+${escapeHtml(b.status)}
+</span>
+</td>
+
+<td>
+<span style="
+color:#166534;
+font-weight:900;
+font-size:11px;
+">
+${b.paymentVerified ? "VERIFIED" : "PENDING"}
+</span>
+
+<br>
+
+<span style="
+font-size:9px;
+color:#64748b;
+">
+${escapeHtml(
+  b.paystackReference || ""
+)}
+</span>
+
+</td>
+
+<td>
+${b.createdAt
+  ? escapeHtml(
+      new Date(
+        b.createdAt
+      ).toLocaleString()
+    )
+  : ""}
+</td>
+
+<td>
+
+<a
+ href="/logistics/receipt/${encodeURIComponent(b.tracking)}"
+ target="_blank"
+ style="
+ background:#0f2e6d;
+ color:#fff;
+ padding:7px 10px;
+ border-radius:7px;
+ text-decoration:none;
+ font-size:10px;
+ font-weight:900;
+ "
+>
+Receipt
+</a>
+
+<a
+ href="/logistics/track/${encodeURIComponent(b.tracking)}"
+ target="_blank"
+ style="
+ background:#16a34a;
+ color:#fff;
+ padding:7px 10px;
+ border-radius:7px;
+ text-decoration:none;
+ font-size:10px;
+ font-weight:900;
+ margin-left:4px;
+ "
+>
+Track
+</a>
+
+</td>
+
+</tr>
+`;
+
+      }
+    ).join("");
+
+  res.send(`
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta
+ name="viewport"
+ content="width=device-width,initial-scale=1">
+
+<title>
+Skylink Logistics Admin
+</title>
+
+<style>
+
+body{
+ margin:0;
+ background:#f1f5f9;
+ font-family:Arial,Helvetica,sans-serif;
+ color:#111827;
+}
+
+.header{
+ background:#0f2e6d;
+ color:#fff;
+ padding:20px;
+}
+
+.headerInner{
+ max-width:1250px;
+ margin:auto;
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:15px;
+}
+
+.logo{
+ font-size:20px;
+ font-weight:900;
+}
+
+.logo span{
+ color:#facc15;
+}
+
+.subtitle{
+ margin-top:4px;
+ font-size:10px;
+ opacity:.75;
+}
+
+.container{
+ max-width:1250px;
+ margin:20px auto;
+ padding:0 15px;
+}
+
+.stats{
+ display:grid;
+ grid-template-columns:repeat(3,1fr);
+ gap:14px;
+}
+
+.stat{
+ background:#fff;
+ border:1px solid #e2e8f0;
+ border-radius:13px;
+ padding:18px;
+}
+
+.statLabel{
+ font-size:10px;
+ color:#64748b;
+ font-weight:900;
+}
+
+.statValue{
+ margin-top:5px;
+ font-size:24px;
+ font-weight:900;
+ color:#0f2e6d;
+}
+
+.tableCard{
+ margin-top:18px;
+ background:#fff;
+ border:1px solid #e2e8f0;
+ border-radius:14px;
+ overflow:hidden;
+}
+
+.tableHeader{
+ padding:18px;
+ font-weight:900;
+}
+
+.tableWrap{
+ overflow:auto;
+}
+
+table{
+ width:100%;
+ min-width:1100px;
+ border-collapse:collapse;
+}
+
+th{
+ text-align:left;
+ background:#f8fafc;
+ padding:12px;
+ font-size:10px;
+ color:#64748b;
+}
+
+td{
+ padding:12px;
+ border-top:1px solid #edf2f7;
+ font-size:11px;
+ vertical-align:top;
+}
+
+.empty{
+ padding:50px;
+ text-align:center;
+ color:#94a3b8;
+}
+
+@media(max-width:700px){
+
+ .stats{
+   grid-template-columns:1fr;
+ }
+
+ .headerInner{
+   flex-direction:column;
+   align-items:flex-start;
+ }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+
+<div class="headerInner">
+
+<div>
+
+<div class="logo">
+SKYLINK <span>LOGISTICS</span>
+</div>
+
+<div class="subtitle">
+LOGISTICS RECORDS • PRIVATE ADMIN
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="container">
+
+<div class="stats">
+
+<div class="stat">
+
+<div class="statLabel">
+TOTAL LOGISTICS SHIPMENTS
+</div>
+
+<div class="statValue">
+${total}
+</div>
+
+</div>
+
+<div class="stat">
+
+<div class="statLabel">
+PAYMENTS VERIFIED
+</div>
+
+<div class="statValue">
+${paid}
+</div>
+
+</div>
+
+<div class="stat">
+
+<div class="statLabel">
+TODAY
+</div>
+
+<div class="statValue">
+${today}
+</div>
+
+</div>
+
+</div>
+
+<div class="tableCard">
+
+<div class="tableHeader">
+Skylink Logistics Shipments
+</div>
+
+<div class="tableWrap">
+
+<table>
+
+<thead>
+
+<tr>
+
+<th>SHIPMENT</th>
+<th>TRACKING</th>
+<th>CUSTOMER</th>
+<th>ROUTE</th>
+<th>STATUS</th>
+<th>PAYMENT</th>
+<th>DATE</th>
+<th>ACTION</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+${rows ||
+`
+<tr>
+<td
+ colspan="8"
+ class="empty">
+No Logistics shipments yet.
+</td>
+</tr>
+`}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+</div>
+
+</body>
+</html>
+`);
+
+}
+
+/*
+|--------------------------------------------------------------------------
+| Install into server.js
+|--------------------------------------------------------------------------
+*/
+
+function install(app, options = {}){
+
+  const airports =
+    options.airports || [];
+
+  /*
+  Initialize database after existing V9 MongoDB
+  connection has had a chance to start.
+  */
+
+  setTimeout(
+    initLogisticsDB,
+    1500
+  );
+
+  /*
+  Customer Logistics website
+  */
+
+  app.get(
+    "/logistics",
+    function(req,res){
+      logisticsHome(
+        req,
+        res,
+        airports
+      );
+    }
+  );
+
+  /*
+  Payment initialization
+  */
+
+  app.post(
+    "/api/logistics/payment/initialize",
+    initializePayment
+  );
+
+  /*
+  Payment verification
+  */
+
+  app.post(
+    "/api/logistics/payment/verify",
+    verifyPayment
+  );
+
+  /*
+  Paystack webhook
+
+  IMPORTANT:
+  This route is registered with express.json()
+  already enabled by V9.
+
+  Paystack signature is checked against the
+  request body.
+  */
+
+  app.post(
+    "/api/logistics/webhook",
+    webhook
+  );
+
+  /*
+  Callback fallback.
+  The actual payment is still verified server-side.
+  */
+
+  app.get(
+    "/logistics/payment/callback",
+    function(req,res){
+
+      const reference =
+        clean(
+          req.query.reference,
+          150
+        );
+
+      if(!reference){
+
+        return res.status(400).send(
+          notFoundPage(
+            "Payment Reference Missing"
+          )
+        );
+
+      }
+
+      res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport"
+content="width=device-width,initial-scale=1">
+<title>Payment Verification</title>
+</head>
+
+<body style="
+font-family:Arial;
+text-align:center;
+padding:50px 20px;
+">
+
+<h2>
+Verifying your payment...
+</h2>
+
+<script>
+
+fetch(
+ "/api/logistics/payment/verify",
+ {
+   method:"POST",
+   headers:{
+     "Content-Type":"application/json"
+   },
+   body:JSON.stringify({
+     reference:
+       ${JSON.stringify(reference)}
+   })
+ }
+)
+.then(function(r){
+ return r.json();
+})
+.then(function(data){
+
+ if(
+   data.status &&
+   data.receiptUrl
+ ){
+
+   window.location.href =
+     data.receiptUrl;
+
+ }else{
+
+   document.body.innerHTML =
+     "<h2>Payment could not be verified.</h2>" +
+     "<p>" +
+     (data.error || "") +
+     "</p>";
+
+ }
+
+})
+.catch(function(){
+
+ document.body.innerHTML =
+   "<h2>Payment verification error.</h2>";
+
+});
+
+<\/script>
+
+</body>
+</html>
+`);
+
+    }
+  );
+
+  /*
+  Receipt
+  */
+
+  app.get(
+    "/logistics/receipt/:code",
+    receipt
+  );
+
+  /*
+  Dedicated tracking.
+  No navigation back to receipt/main website.
+  */
+
+  app.get(
+    "/logistics/track/:code",
+    trackingPage
+  );
+
+  /*
+  Separate Logistics admin section.
+  */
+
+  app.get(
+    "/skylink-admin-gospel-2024/logistics",
+    adminDashboard
+  );
+
+  console.log(
+    "SKYLINK LOGISTICS routes installed."
+  );
+
+}
+
+module.exports = {
+  install,
+  initLogisticsDB
+};
