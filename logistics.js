@@ -1078,7 +1078,9 @@ document
 
       packageQuantity:
         document.getElementById("packageQuantity")
-        .value.trim()
+        .value.trim(),
+      shipDate: document.getElementById("shipDate").value,
+      shipTime: document.getElementById("shipTime").value
     };
 
     try{
