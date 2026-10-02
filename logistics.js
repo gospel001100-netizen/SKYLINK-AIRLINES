@@ -772,6 +772,20 @@ textarea:focus{
   maxlength="500"
   placeholder="Delivery / destination address"></textarea>
 
+<label>Shipment Date</label>
+<input
+  id="shipDate"
+  type="date"
+  required
+>
+
+<label>Shipment Time</label>
+<input
+  id="shipTime"
+  type="time"
+  required
+>
+
 </div>
 
 <div class="section">
