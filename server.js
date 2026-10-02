@@ -193,6 +193,153 @@ app.get('/skylink-admin-login', (req,res)=>{ res.send(`<html><head><meta name="v
 app.post('/api/admin-login', (req,res)=>{ const pass = req.body.password || ''; if(pass === ADMIN_PASSWORD){ res.setHeader('Set-Cookie', 'admin_auth=Skylink1824; Path=/; Max-Age=86400; HttpOnly'); res.redirect('/skylink-admin-gospel-2024'); } else { res.send('<script>alert("Wrong password"); location.href="/skylink-admin-login"</script>'); } });
 app.get('/skylink-admin-logout', (req,res)=>{ res.setHeader('Set-Cookie', 'admin_auth=; Path=/; Max-Age=0'); res.redirect('/skylink-admin-login'); });
 app.get('/', (req,res)=>{
+ // NEW HOMEPAGE - 2 OPTIONS
+app.get('/', (req,res)=>{
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SKYLINK</title><style>
+body{margin:0;font-family:Inter,Arial;background:#f1f5f9;display:flex;justify-content:center;padding:20px;min-height:100vh;align-items:center}
+.card{width:100%;max-width:700px;background:#fff;border-radius:24px;padding:30px;box-shadow:0 12px 40px rgba(0,0,0,.1);border:1px solid #e2e8f0;text-align:center}
+.pill{background:#0f2e6d;color:#fff;padding:14px 26px;border-radius:30px;font-weight:900;font-size:18px;display:inline-flex;gap:8px}
+.pill span{color:#FACC15}
+.sub{font-size:11px;color:#64748b;font-weight:800;margin:12px 0 24px;letter-spacing:1px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+.option{border:2px solid #e2e8f0;border-radius:18px;padding:22px;cursor:pointer;transition:.2s;background:#f8fafc;text-decoration:none;color:#0f172a;display:block}
+.option:hover{border-color:#0f2e6d;background:#fff;transform:translateY(-3px);box-shadow:0 8px 20px rgba(0,0,0,.08)}
+.icon{font-size:36px;margin-bottom:10px}
+.title{font-weight:900;font-size:16px}
+.desc{font-size:12px;color:#64748b;margin-top:6px;font-weight:600}
+.price{margin-top:10px;background:#0f2e6d;color:#fff;display:inline-block;padding:6px 14px;border-radius:20px;font-weight:900;font-size:12px}
+.price.log{background:#16a34a}
+</style></head><body><div class="card">
+<div class="pill">✈️ SKYLINK <span>GROUP</span></div>
+<div class="sub">OFFICIAL PORTAL - CHOOSE SERVICE</div>
+<div class="grid">
+<a class="option" href="/flights">
+<div class="icon">✈️</div>
+<div class="title">SKYLINK AIRLINES</div>
+<div class="desc">Book flights to 150+ airports worldwide<br>Real-time tracking & boarding pass</div>
+<div class="price">NGN 2,150</div>
+</a>
+<a class="option" href="/logistics">
+<div class="icon">📦</div>
+<div class="title">SKYLINK LOGISTICS</div>
+<div class="desc">Cargo Plane + Delivery Van<br>Real tracking with sender/receiver details</div>
+<div class="price log">NGN 3,000</div>
+</a>
+</div>
+<div style="margin-top:20px;font-size:11px;color:#94a3b8">Licensed & Approved • Secure Paystack Payments • Permanent Records</div>
+</div></body></html>`);
+});
+
+// YOUR V9 AIRLINES MOVED TO /flights - 100% UNTOUCHED
+app.get('/flights', (req,res)=>{
+  const aj = JSON.stringify(AIRPORTS);
+  const pk = process.env.PAYSTACK_PUBLIC_KEY || 'pk_live_d820c59c33c0628f48f10176e8ff25b243fd6c73';
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>SKYLINK AIRLINES</title><script src="https://js.paystack.co/v1/inline.js"><\/script><style>
+*{box-sizing:border-box} html{font-size:16px}
+body{margin:0;font-family:Inter,Arial;background:#f1f5f9;padding:0;display:block}
+.wrapper{width:100%;min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:12px}
+.card{width:100%;max-width:540px;background:#fff;border-radius:20px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.08);border:1px solid #e2e8f0;margin-top:10px}
+.header{display:flex;justify-content:center;margin-bottom:8px}
+.pill{background:#0f2e6d;color:#fff;padding:14px 26px;border-radius:30px;font-weight:900;font-size:17px;display:flex;align-items:center;gap:8px}
+.pill span:last-child{color:#FACC15}
+.sub{font-size:11px;font-weight:800;color:#64748b;text-align:center;margin-bottom:18px;letter-spacing:0.8px}
+label{font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;margin-top:16px;margin-bottom:6px;color:#0f172a}
+.badge{background:#dbeafe;color:#1e40af;font-size:9px;font-weight:900;padding:3px 8px;border-radius:10px}
+input{width:100%;padding:15px 16px;border-radius:12px;border:1.5px solid #e2e8f0;font-size:16px;font-weight:600;background:#f8fafc;color:#000;outline:none}
+input:focus{background:#fff;border-color:#0f2e6d}
+.btn-main{width:100%;background:#0f2e6d;color:#fff;padding:16px;border-radius:12px;border:none;font-weight:800;font-size:16px;margin-top:18px;cursor:pointer}
+.track-row{display:flex;gap:8px;margin-top:14px}
+.btn-track{background:#16a34a;color:#fff;border:none;padding:14px 20px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer}
+.suggest{position:absolute;background:#fff;border:1px solid #e2e8f0;border-radius:10px;max-height:180px;overflow:auto;width:100%;z-index:20;display:none;box-shadow:0 10px 30px rgba(0,0,0,.1)}
+.suggest div{padding:10px 12px;font-size:13px;font-weight:700;cursor:pointer;border-bottom:1px solid #f1f5f9}
+.rel{position:relative}
+#step2{display:none}
+.warning{background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:12px;font-weight:800;font-size:13px;color:#92400E;text-align:center;margin-bottom:12px}
+.summary{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;font-size:14px;line-height:1.6;margin-bottom:12px}
+.top-links{display:flex;gap:10px;justify-content:center;margin-bottom:14px}
+.top-links a{background:#fff;border:1.5px solid #0f2e6d;color:#0f2e6d;padding:8px 14px;border-radius:20px;font-weight:800;font-size:12px;text-decoration:none}
+</style></head><body><div class="wrapper"><div class="card">
+<div class="header"><div class="pill">✈️ SKYLINK <span>AIRLINES</span></div></div>
+<div class="sub">OFFICIAL BOOKING PORTAL</div>
+<div class="top-links"><a href="/">🏠 Home</a><a href="/logistics">📦 Logistics</a></div>
+<div id="step1">
+<form onsubmit="goToPayment(event)">
+<label>Full Name *</label><input id="pname" required placeholder="As on passport" autocomplete="off">
+<label>Email *</label><input id="email" type="email" required placeholder="boarding pass will be sent here" autocomplete="off">
+<label>From * <span class="badge">150+ COUNTRIES</span></label><div class="rel"><input id="from" autocomplete="off" oninput="autoSuggest('from')" placeholder="e.g. SAH - Sanaa, Yemen" required><div id="from-suggest" class="suggest"></div></div>
+<label>To *</label><div class="rel"><input id="to" autocomplete="off" oninput="autoSuggest('to')" placeholder="e.g. LOS - Lagos" required><div id="to-suggest" class="suggest"></div></div>
+<label>Departure Date & Time *</label><input type="datetime-local" id="depart" required>
+<button class="btn-main" type="submit">Continue →</button>
+</form>
+<div class="track-row"><input id="trk" placeholder="TRK-XXXXXXX" style="flex:1;background:#fff;padding:14px;border-radius:10px;border:1.5px solid #e2e8f0"><button class="btn-track" onclick="if(document.getElementById('trk').value) location.href='/track?code='+document.getElementById('trk').value">Track</button></div>
+</div>
+<div id="step2">
+<div class="summary" id="summary"></div>
+<div class="warning">WARNING!!! Transfer this exact amount: <b>NGN 2,150</b> - Do not pay more or less to avoid booking failure.</div>
+<button class="btn-main" id="payBtn" onclick="payWithPaystack()">Pay NGN 2,150 & Generate Boarding Pass</button>
+<button class="btn-main" style="background:#fff;color:#0f2e6d;border:1.5px solid #0f2e6d;margin-top:8px" onclick="backToForm()">← Back</button>
+</div>
+</div></div>
+<script>
+const airports=${aj};
+const PAYSTACK_PUBLIC_KEY="${pk}";
+let pendingPayload=null;
+function autoSuggest(t){
+  const i=document.getElementById(t), b=document.getElementById(t+"-suggest"), q=i.value.toLowerCase();
+  if(!q){b.style.display="none";return}
+  const f=airports.filter(a=>(a.code+" "+a.city+" "+a.country+" "+a.name).toLowerCase().includes(q)).slice(0,12);
+  if(!f.length){b.style.display="none";return}
+  b.innerHTML=f.map(a=>"<div onclick=\\"selectAirport('"+t+"','"+a.code+"')\\"><b>"+a.code+"</b> - "+a.city+", "+a.country+" - "+a.name+"</div>").join("");
+  b.style.display="block";
+}
+function selectAirport(t,c){
+  const a=airports.find(x=>x.code===c);
+  document.getElementById(t).value=a.code+" - "+a.city+", "+a.country+" ("+a.name+")";
+  document.getElementById(t).dataset.code=c;
+  document.getElementById(t+"-suggest").style.display="none";
+}
+function goToPayment(e){
+  e.preventDefault();
+  const name=document.getElementById("pname").value.trim();
+  const email=document.getElementById("email").value.trim();
+  const from=document.getElementById("from").dataset.code||document.getElementById("from").value.split(" ")[0].toUpperCase();
+  const to=document.getElementById("to").dataset.code||document.getElementById("to").value.split(" ")[0].toUpperCase();
+  const depart=document.getElementById("depart").value;
+  if(!name||!email||!from||!to||!depart){alert("Fill all fields");return}
+  pendingPayload={name,email,from,to,depart,class:"ECONOMY"};
+  document.getElementById("summary").innerHTML="<b>Passenger:</b> "+name+"<br><b>Route:</b> "+from+" → "+to+"<br><b>Departure:</b> "+new Date(depart).toLocaleString()+"<br><b>Amount:</b> NGN 2,150";
+  document.getElementById("step1").style.display="none";
+  document.getElementById("step2").style.display="block";
+}
+function backToForm(){document.getElementById("step2").style.display="none";document.getElementById("step1").style.display="block";}
+function payWithPaystack(){
+  var btn=document.getElementById("payBtn");
+  if(typeof PaystackPop === 'undefined'){ alert("Paystack not loaded"); btn.disabled=false; return; }
+  btn.innerText="Processing Payment..."; btn.disabled=true;
+  try{
+    var handler = PaystackPop.setup({
+      key: PAYSTACK_PUBLIC_KEY,
+      email: pendingPayload.email,
+      amount: 2150 * 100,
+      currency: "NGN",
+      ref: "SKY-" + Math.floor(Math.random()*1000000000),
+      onClose: function(){ btn.innerText="Pay NGN 2,150 & Generate Boarding Pass"; btn.disabled=false; },
+      callback: function(response){
+        btn.innerText="Payment successful! Generating ticket...";
+        pendingPayload.paystackRef = response.reference;
+        fetch("/api/book",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(pendingPayload)})
+.then(function(r){return r.json()})
+.then(function(d){ if(d.boardingUrl){ window.location = d.boardingUrl; } else { alert(d.error||"Failed"); btn.disabled=false; } })
+.catch(function(err){ alert("Error: "+err.message); btn.disabled=false; });
+      }
+    });
+    handler.openIframe();
+  }catch(err){ alert("Paystack error: "+err.message); btn.disabled=false; }
+}
+document.addEventListener("click",function(e){if(!e.target.closest(".rel"))document.querySelectorAll(".suggest").forEach(function(s){s.style.display="none"})});
+<\/script></body></html>`);
+});
   const aj = JSON.stringify(AIRPORTS);
   const pk = process.env.PAYSTACK_PUBLIC_KEY || 'pk_live_d820c59c33c0628f48f10176e8ff25b243fd6c73';
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>SKYLINK AIRLINES</title><script src="https://js.paystack.co/v1/inline.js"><\/script><style>
