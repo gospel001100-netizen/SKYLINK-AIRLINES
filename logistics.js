@@ -2716,19 +2716,227 @@ async function trackingPage(req, res){
 
   }
 
+  /* ---------------------------------------------------------------
+     LIVE SHIPMENT STATUS + MAP COORDINATE VALIDATION
+     --------------------------------------------------------------- */
+
+  const fromLat =
+    Number(record.originLat);
+
+  const fromLon =
+    Number(record.originLon);
+
+  const toLat =
+    Number(record.destinationLat);
+
+  const toLon =
+    Number(record.destinationLon);
+
   const hasMap =
-    Number.isFinite(
-      Number(record.originLat)
-    ) &&
-    Number.isFinite(
-      Number(record.originLon)
-    ) &&
-    Number.isFinite(
-      Number(record.destinationLat)
-    ) &&
-    Number.isFinite(
-      Number(record.destinationLon)
+    record.originLat != null &&
+    record.originLat !== "" &&
+    isFinite(Number(record.originLat)) &&
+
+    record.originLon != null &&
+    record.originLon !== "" &&
+    isFinite(Number(record.originLon)) &&
+
+    record.destinationLat != null &&
+    record.destinationLat !== "" &&
+    isFinite(Number(record.destinationLat)) &&
+
+    record.destinationLon != null &&
+    record.destinationLon !== "" &&
+    isFinite(Number(record.destinationLon));
+
+  /* ---------------------------------------------------------------
+     REAL-TIME SHIPMENT STATUS
+     --------------------------------------------------------------- */
+
+  const datePart =
+    typeof record.shipDate === "string"
+      ? record.shipDate.trim()
+      : "";
+
+  const timePart =
+    typeof record.shipTime === "string"
+      ? record.shipTime.trim()
+      : "";
+
+  let depTimeMs = NaN;
+
+  /*
+   * Use Luxon when available and an origin timezone exists.
+   * typeof check prevents ReferenceError when DateTime is not loaded.
+   */
+
+  if(
+    datePart &&
+    timePart &&
+    record.originTimezone &&
+    typeof DateTime !== "undefined"
+  ){
+
+    try{
+
+      const departureDate =
+        DateTime.fromISO(
+          datePart +
+          "T" +
+          timePart +
+          ":00",
+          {
+            zone:
+              record.originTimezone
+          }
+        );
+
+      if(
+        departureDate &&
+        departureDate.isValid
+      ){
+
+        depTimeMs =
+          departureDate.toMillis();
+
+      }
+
+    }catch(e){
+
+      depTimeMs = NaN;
+
+    }
+
+  }
+
+  /*
+   * JavaScript UTC fallback.
+   */
+
+  if(
+    !Number.isFinite(depTimeMs) &&
+    datePart &&
+    timePart
+  ){
+
+    try{
+
+      const fallbackDate =
+        new Date(
+          datePart +
+          "T" +
+          timePart +
+          ":00Z"
+        );
+
+      depTimeMs =
+        fallbackDate.getTime();
+
+    }catch(e){
+
+      depTimeMs = NaN;
+
+    }
+
+  }
+
+  /*
+   * Final safe fallback.
+   */
+
+  if(!Number.isFinite(depTimeMs)){
+
+    depTimeMs =
+      Date.now();
+
+  }
+
+  /*
+   * Cargo flight speed:
+   * 850 km/h.
+   */
+
+  let distance =
+    Number(record.distanceKm);
+
+  if(!Number.isFinite(distance)){
+
+    distance = 0;
+
+  }
+
+  const totalHours =
+    distance > 0
+      ? Math.max(
+          2,
+          distance / 850
+        )
+      : 22;
+
+  const diffHours =
+    (Date.now() - depTimeMs) /
+    3600000;
+
+  let liveStatus;
+  let progress;
+
+  if(diffHours < 0){
+
+    liveStatus =
+      "Shipment Booked";
+
+    progress =
+      0;
+
+  }else if(diffHours < totalHours){
+
+    liveStatus =
+      "In Transit";
+
+    progress =
+      Math.min(
+        0.99,
+        Math.max(
+          0,
+          diffHours / totalHours
+        )
+      );
+
+  }else{
+
+    liveStatus =
+      "Arrived at Destination";
+
+    progress =
+      1;
+
+  }
+
+  /*
+   * Keep progress completely safe for the browser.
+   */
+
+  progress =
+    Math.min(
+      1,
+      Math.max(
+        0,
+        Number.isFinite(progress)
+          ? progress
+          : 0
+      )
     );
+
+  /*
+   * Update the record status used by the tracking page.
+   */
+
+  record.status =
+    liveStatus;
+
+  /* ---------------------------------------------------------------
+     DARK LIVE MAP
+     --------------------------------------------------------------- */
 
   const mapHTML = hasMap
     ? `
@@ -2744,81 +2952,316 @@ Shipment Route
 
 <script
  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
-<\/script>
+<\\/script>
 
 <script>
 
-const fromLat =
- ${Number(record.originLat)};
+(function(){
 
-const fromLon =
- ${Number(record.originLon)};
+  const fromLat =
+    ${JSON.stringify(fromLat)};
 
-const toLat =
- ${Number(record.destinationLat)};
+  const fromLon =
+    ${JSON.stringify(fromLon)};
 
-const toLon =
- ${Number(record.destinationLon)};
+  const toLat =
+    ${JSON.stringify(toLat)};
 
-const map =
- L.map("map");
+  const toLon =
+    ${JSON.stringify(toLon)};
 
-L.tileLayer(
- "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
- {
-   maxZoom:18,
-   attribution:"© OpenStreetMap"
- }
-).addTo(map);
+  let progress =
+    ${JSON.stringify(progress)};
 
-const line =
- L.polyline(
-   [
-     [fromLat,fromLon],
-     [toLat,toLon]
-   ],
-   {
-     weight:4,
-     dashArray:"7,8"
-   }
-).addTo(map);
+  /*
+   * Finds the shortest longitude path.
+   * This prevents the map from travelling the
+   * long way around when crossing the Pacific.
+   */
 
-L.marker(
- [fromLat,fromLon]
-).addTo(map)
-.bindPopup(
- ${JSON.stringify(
-   record.originCity +
-   ", " +
-   record.originCountry
- )}
-);
+  function shortestLon(
+    lon1,
+    lon2,
+    p
+  ){
 
-L.marker(
- [toLat,toLon]
-).addTo(map)
-.bindPopup(
- ${JSON.stringify(
-   record.destinationCity +
-   ", " +
-   record.destinationCountry
- )}
-);
+    let d =
+      lon2 - lon1;
 
-map.fitBounds(
- line.getBounds(),
- {
-   padding:[30,30]
- }
-);
+    if(d > 180){
 
-<\/script>
+      d -= 360;
+
+    }
+
+    if(d < -180){
+
+      d += 360;
+
+    }
+
+    let cur =
+      lon1 +
+      d * p;
+
+    cur =
+      ((cur + 180) % 360 + 360) %
+      360 - 180;
+
+    return cur;
+
+  }
+
+  /*
+   * Calculate the current aircraft position.
+   */
+
+  function getCurrentPosition(){
+
+    const curLat =
+      fromLat +
+      (
+        toLat -
+        fromLat
+      ) *
+      progress;
+
+    const curLon =
+      shortestLon(
+        fromLon,
+        toLon,
+        progress
+      );
+
+    return [
+      curLat,
+      curLon
+    ];
+
+  }
+
+  const currentPosition =
+    getCurrentPosition();
+
+  /*
+   * Dark Leaflet map.
+   */
+
+  const map =
+    L.map(
+      "map",
+      {
+        worldCopyJump:true
+      }
+    ).setView(
+      currentPosition,
+      4
+    );
+
+  /*
+   * CARTO Dark tiles.
+   */
+
+  L.tileLayer(
+    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    {
+      maxZoom:19,
+      attribution:
+        "© OpenStreetMap contributors © CARTO"
+    }
+  ).addTo(map);
+
+  /*
+   * Full planned route.
+   */
+
+  const routeLine =
+    L.polyline(
+      [
+        [
+          fromLat,
+          fromLon
+        ],
+        [
+          toLat,
+          toLon
+        ]
+      ],
+      {
+        color:"#38bdf8",
+        weight:4,
+        dashArray:"8,10"
+      }
+    ).addTo(map);
+
+  /*
+   * Route already travelled.
+   */
+
+  const traveledLine =
+    L.polyline(
+      [
+        [
+          fromLat,
+          fromLon
+        ],
+        currentPosition
+      ],
+      {
+        color:"#facc15",
+        weight:4
+      }
+    ).addTo(map);
+
+  /*
+   * Origin marker.
+   */
+
+  L.marker(
+    [
+      fromLat,
+      fromLon
+    ]
+  )
+  .addTo(map)
+  .bindPopup(
+    ${JSON.stringify(
+      String(record.originCity || "") +
+      ", " +
+      String(record.originCountry || "")
+    )}
+  );
+
+  /*
+   * Destination marker.
+   */
+
+  L.marker(
+    [
+      toLat,
+      toLon
+    ]
+  )
+  .addTo(map)
+  .bindPopup(
+    ${JSON.stringify(
+      String(record.destinationCity || "") +
+      ", " +
+      String(record.destinationCountry || "")
+    )}
+  );
+
+  /*
+   * Aircraft icon.
+   */
+
+  const planeIcon =
+    L.divIcon({
+      className:
+        "skylink-plane-icon",
+
+      html:
+        "✈️",
+
+      iconSize:
+        [
+          30,
+          30
+        ],
+
+      iconAnchor:
+        [
+          15,
+          15
+        ]
+    });
+
+  /*
+   * Aircraft marker.
+   */
+
+  const planeMarker =
+    L.marker(
+      currentPosition,
+      {
+        icon:
+          planeIcon
+      }
+    ).addTo(map);
+
+  /*
+   * Update aircraft and travelled route.
+   */
+
+  function updatePlane(){
+
+    const position =
+      getCurrentPosition();
+
+    planeMarker.setLatLng(
+      position
+    );
+
+    traveledLine.setLatLngs(
+      [
+        [
+          fromLat,
+          fromLon
+        ],
+        position
+      ]
+    );
+
+  }
+
+  /*
+   * Initial position update.
+   */
+
+  updatePlane();
+
+  /*
+   * Move aircraft every 3 seconds.
+   */
+
+  setInterval(
+    function(){
+
+      if(progress >= 1){
+
+        progress = 1;
+
+        updatePlane();
+
+        return;
+
+      }
+
+      progress =
+        Math.min(
+          1,
+          progress + 0.00015
+        );
+
+      updatePlane();
+
+    },
+    3000
+  );
+
+})();
+
+<\\/script>
 `
     : `
 <div class="noMap">
 Route map coordinates are currently unavailable.
 </div>
 `;
+
+  /* ---------------------------------------------------------------
+     LOCAL TIMES
+     --------------------------------------------------------------- */
 
   const originTime =
     formatDate(
@@ -2831,6 +3274,10 @@ Route map coordinates are currently unavailable.
       record.createdAt,
       record.destinationTimezone
     );
+
+  /* ---------------------------------------------------------------
+     TRACKING PAGE
+     --------------------------------------------------------------- */
 
   res.send(`
 <!DOCTYPE html>
@@ -2930,8 +3377,8 @@ body{
 
 .label{
  font-size:9px;
- color:#64748b;
  font-weight:900;
+ color:#64748b;
  text-transform:uppercase;
  letter-spacing:.5px;
 }
@@ -2952,10 +3399,22 @@ body{
 
 #map{
  width:100%;
- height:400px;
+ height:420px;
  margin-top:10px;
  border-radius:14px;
- border:1px solid #dbe3ec;
+ border:1px solid #1e293b;
+ background:#0f172a;
+ overflow:hidden;
+}
+
+.skylink-plane-icon{
+ background:transparent;
+ border:0;
+ font-size:30px;
+ line-height:30px;
+ width:30px !important;
+ height:30px !important;
+ text-align:center;
 }
 
 .noMap{
@@ -2984,7 +3443,7 @@ body{
  }
 
  #map{
-   height:330px;
+   height:420px;
  }
 
 }
@@ -3034,9 +3493,13 @@ ${escapeHtml(record.originCity)},
 ${escapeHtml(record.originCountry)}
 </div>
 
-<div class="value"
+<div
+ class="value"
  style="font-size:11px;color:#64748b">
-${escapeHtml(record.originAddress || "Address not provided")}
+${escapeHtml(
+  record.originAddress ||
+  "Address not provided"
+)}
 </div>
 
 </div>
@@ -3052,9 +3515,13 @@ ${escapeHtml(record.destinationCity)},
 ${escapeHtml(record.destinationCountry)}
 </div>
 
-<div class="value"
+<div
+ class="value"
  style="font-size:11px;color:#64748b">
-${escapeHtml(record.destinationAddress || "Address not provided")}
+${escapeHtml(
+  record.destinationAddress ||
+  "Address not provided"
+)}
 </div>
 
 </div>
@@ -3066,7 +3533,7 @@ Distance
 </div>
 
 <div class="value">
-${escapeHtml(record.distanceKm || 0)} km
+${escapeHtml(distance)} km
 </div>
 
 </div>
@@ -3078,7 +3545,9 @@ Shipment
 </div>
 
 <div class="value">
-${escapeHtml(record.packageDescription)}
+${escapeHtml(
+  record.packageDescription
+)}
 </div>
 
 </div>
@@ -3123,59 +3592,6 @@ Skylink Logistics Shipment Tracking
 
 }
 
-/*
-|--------------------------------------------------------------------------
-| Not found page
-|--------------------------------------------------------------------------
-*/
-
-function notFoundPage(title){
-
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-
-<meta
- name="viewport"
- content="width=device-width,initial-scale=1">
-
-<title>${escapeHtml(title)}</title>
-
-</head>
-
-<body style="
-margin:0;
-padding:40px 20px;
-font-family:Arial;
-text-align:center;
-background:#f8fafc;
-">
-
-<div style="
-max-width:500px;
-margin:auto;
-background:#fff;
-padding:30px;
-border-radius:15px;
-border:1px solid #e2e8f0;
-">
-
-<h2 style="color:#0f2e6d">
-${escapeHtml(title)}
-</h2>
-
-<p style="color:#64748b">
-The requested Logistics record could not be found.
-</p>
-
-</div>
-
-</body>
-</html>
-`;
-
-}
 
 /*
 |--------------------------------------------------------------------------
