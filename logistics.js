@@ -2699,57 +2699,837 @@ function downloadReceipt(){
 */
 
 async function trackingPage(req, res){
-  const code = clean(req.params.code, 150);
-  const record = await findShipment(code);
+
+  const code =
+    clean(req.params.code, 150);
+
+  const record =
+    await findShipment(code);
+
   if(!record){
-    return res.status(404).send(notFoundPage("Shipment Not Found"));
+
+    return res.status(404).send(
+      notFoundPage(
+        "Shipment Not Found"
+      )
+    );
+
   }
 
-  const fromLat = Number(record.originLat);
-  const fromLon = Number(record.originLon);
-  const toLat = Number(record.destinationLat);
-  const toLon = Number(record.destinationLon);
+  /* ---------------------------------------------------------------
+     LIVE SHIPMENT STATUS + MAP COORDINATE VALIDATION
+     --------------------------------------------------------------- */
+
+  const fromLat =
+    Number(record.originLat);
+
+  const fromLon =
+    Number(record.originLon);
+
+  const toLat =
+    Number(record.destinationLat);
+
+  const toLon =
+    Number(record.destinationLon);
 
   const hasMap =
-    record.originLat != null && record.originLat !== "" && isFinite(Number(record.originLat)) &&
-    record.originLon != null && record.originLon !== "" && isFinite(Number(record.originLon)) &&
-    record.destinationLat != null && record.destinationLat !== "" && isFinite(Number(record.destinationLat)) &&
-    record.destinationLon != null && record.destinationLon !== "" && isFinite(Number(record.destinationLon));
+    record.originLat != null &&
+    record.originLat !== "" &&
+    isFinite(Number(record.originLat)) &&
 
-  const datePart = typeof record.shipDate === "string" ? record.shipDate.trim() : "";
-  const timePart = typeof record.shipTime === "string" ? record.shipTime.trim() : "";
+    record.originLon != null &&
+    record.originLon !== "" &&
+    isFinite(Number(record.originLon)) &&
+
+    record.destinationLat != null &&
+    record.destinationLat !== "" &&
+    isFinite(Number(record.destinationLat)) &&
+
+    record.destinationLon != null &&
+    record.destinationLon !== "" &&
+    isFinite(Number(record.destinationLon));
+
+  /* ---------------------------------------------------------------
+     REAL-TIME SHIPMENT STATUS
+     --------------------------------------------------------------- */
+
+  const datePart =
+    typeof record.shipDate === "string"
+      ? record.shipDate.trim()
+      : "";
+
+  const timePart =
+    typeof record.shipTime === "string"
+      ? record.shipTime.trim()
+      : "";
+
   let depTimeMs = NaN;
-  let depTimeLuxon = null;
 
-  if(datePart && timePart && record.originTimezone && typeof DateTime !== "undefined"){
+  if(
+    datePart &&
+    timePart &&
+    record.originTimezone &&
+    typeof DateTime !== "undefined"
+  ){
+
     try{
-      const d = DateTime.fromISO(datePart+"T"+timePart+":00",{zone:record.originTimezone});
-      if(d && d.isValid){ depTimeMs = d.toMillis(); depTimeLuxon = d; }
-    }catch(e){}
+
+      const departureDate =
+        DateTime.fromISO(
+          datePart +
+          "T" +
+          timePart +
+          ":00",
+          {
+            zone:
+              record.originTimezone
+          }
+        );
+
+      if(
+        departureDate &&
+        departureDate.isValid
+      ){
+
+        depTimeMs =
+          departureDate.toMillis();
+
+      }
+
+    }catch(e){
+
+      depTimeMs = NaN;
+
+    }
+
   }
-  if(!Number.isFinite(depTimeMs) && datePart && timePart){
-    try{ const d2=new Date(datePart+"T"+timePart+":00Z"); depTimeMs=d2.getTime(); }catch(e){}
+
+  if(
+    !Number.isFinite(depTimeMs) &&
+    datePart &&
+    timePart
+  ){
+
+    try{
+
+      const fallbackDate =
+        new Date(
+          datePart +
+          "T" +
+          timePart +
+          ":00Z"
+        );
+
+      depTimeMs =
+        fallbackDate.getTime();
+
+    }catch(e){
+
+      depTimeMs = NaN;
+
+    }
+
   }
-  if(!Number.isFinite(depTimeMs)) depTimeMs = Date.now();
 
-  let distance = Number(record.distanceKm);
-  if(!Number.isFinite(distance)) distance = 0;
-  const totalHours = distance>0 ? Math.max(2, distance/850) : 22;
-  const diffHours = (Date.now() - depTimeMs)/3600000;
+  if(!Number.isFinite(depTimeMs)){
 
-  let liveStatus, progress, remainingMs, elapsedMs;
-  if(diffHours < 0){ 
-    liveStatus="Shipment Booked"; progress=0; remainingMs=Math.abs(Date.now()-depTimeMs); elapsedMs=0;
-  } else if(diffHours < totalHours){ 
-    liveStatus="In Transit"; progress=Math.min(0.99, Math.max(0, diffHours/totalHours));
-    remainingMs=(totalHours-diffHours)*3600000; elapsedMs=diffHours*3600000;
-  } else { 
-    liveStatus="Arrived at Destination"; progress=1; remainingMs=0; elapsedMs=totalHours*3600000;
+    depTimeMs =
+      new Date(record.createdAt).getTime();
+
   }
-  const originTime = formatDate(record.createdAt); const destinationTime = formatDate(new Date(new Date(record.createdAt).getTime() + 20.02*3600000)); const depMs = new Date(record.createdAt).getTime(); const progress = Math.min(0.99, Math.max(0.02, (Date.now()-depMs)/(20.02*3600000)));
-  const mapHTML = hasMap ? '<div class="mapTitle">LIVE SHIPMENT STATUS + MAP COORDINATE VALIDATION <span id="liveCountdown" style="float:right;background:#dcfce7;color:#16a34a;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:900;">Calculating...</span></div><div id="map" style="height:380px;border-radius:12px;"></div><div class="progressWrap"><div class="progressBar"><div class="progressFill" id="pfill" style="width:'+(progress*100)+'%"></div></div></div><div class="steps"><div class="step completed"><div class="ic">✅</div><div class="tx">Booked</div></div><div class="step active moving"><div class="ic">🚚</div><div class="tx">In Transit</div></div><div class="step"><div class="ic">✅</div><div class="tx">Arrived</div></div></div><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><scr'+'ipt src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></scr'+'ipt><scr'+'ipt>var fromLat='+Number(record.originLat)+';var fromLon='+Number(record.originLon)+';var toLat='+Number(record.destinationLat)+';var toLon='+Number(record.destinationLon)+';var depTime='+depMs+';var totalHours=20.02;var progressNow='+progress+';function getPos(p){var lat=fromLat+(toLat-fromLat)*p;var d=toLon-fromLon;if(d>180)d-=360;if(d<-180)d+=360;var lon=fromLon+d*p;return[lat,lon];}var map=L.map("map").setView(getPos(progressNow),3);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19, attribution:"© OpenStreetMap"}).addTo(map);L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:"#94a3b8",weight:2,dashArray:"10,10"}).addTo(map);var traveled=L.polyline([[fromLat,fromLon],getPos(progressNow)],{color:"#0f2e6d",weight:4}).addTo(map);var planeIcon=L.divIcon({html:"<div style=font-size:28px;transform:rotate(45deg)>✈️</div>",iconSize:[30,30],className:""});var plane=L.marker(getPos(progressNow),{icon:planeIcon}).addTo(map);L.marker([fromLat,fromLon]).addTo(map).bindPopup("FROM: '+record.originCity+'");L.marker([toLat,toLon]).addTo(map).bindPopup("TO: '+record.destinationCity+'");function fmt(ms){var h=Math.floor(ms/3600000);var m=Math.floor((ms%3600000)/60000);var s=Math.floor((ms%60000)/1000);return h+"h "+m+"m "+s+"s remaining";}function tick(){var now=Date.now();var elapsed=now-depTime;var p=Math.min(0.99,Math.max(0,elapsed/(totalHours*3600000)));var pos=getPos(p);plane.setLatLng(pos);traveled.setLatLngs([[fromLat,fromLon],pos]);var remain=Math.max(0,totalHours*3600000-elapsed);var el=document.getElementById("liveCountdown");if(el)el.innerText="In Transit - "+fmt(remain);var pf=document.getElementById("pfill");if(pf)pf.style.width=(p*100)+"%";}setInterval(tick,1000);tick();</scr'+'ipt>' : '<div class="noMap">Route map unavailable</div>';
 
+  let distance =
+    Number(record.distanceKm);
 
+  if(!Number.isFinite(distance)){
+
+    distance = 0;
+
+  }
+
+  const totalHours =
+    distance > 0
+      ? Math.max(
+          2,
+          distance / 850
+        )
+      : 22;
+
+  const totalHoursFixed = 20.02;
+
+  const diffHours =
+    (Date.now() - depTimeMs) /
+    3600000;
+
+  let liveStatus;
+  let progress;
+
+  if(diffHours < 0){
+
+    liveStatus =
+      "Shipment Booked";
+
+    progress =
+      0;
+
+  }else if(diffHours < totalHours){
+
+    liveStatus =
+      "In Transit";
+
+    progress =
+      Math.min(
+        0.99,
+        Math.max(
+          0,
+          diffHours / totalHours
+        )
+      );
+
+  }else{
+
+    liveStatus =
+      "Arrived at Destination";
+
+    progress =
+      1;
+
+  }
+
+  progress =
+    Math.min(
+      1,
+      Math.max(
+        0,
+        Number.isFinite(progress)
+          ? progress
+          : 0
+      )
+    );
+
+  record.status =
+    liveStatus;
+
+  const depMs =
+    new Date(record.createdAt).getTime();
+
+  /* ---------------------------------------------------------------
+     DARK LIVE MAP + GREEN COUNTDOWN
+     --------------------------------------------------------------- */
+
+  const mapHTML = hasMap
+    ? `
+<link
+ rel="stylesheet"
+ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<div class="mapTitle" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+<span>LIVE SHIPMENT STATUS + MAP COORDINATE VALIDATION</span>
+<span id="liveCountdown" style="background:#dcfce7;color:#16a34a;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:900;border:1px solid #86efac;">Calculating...</span>
+</div>
+
+<div id="map"></div>
+
+<div class="progressBar" style="margin-top:10px;height:8px;background:#e2e8f0;border-radius:8px;overflow:hidden;">
+<div class="progressFill" id="pfill" style="width:${progress*100}%;height:100%;background:#0f2e6d;transition:width 0.5s;"></div>
+</div>
+
+<scr`+`ipt
+ src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</scr`+`ipt>
+
+<scr`+`ipt>
+
+(function(){
+
+  const fromLat =
+    ${JSON.stringify(fromLat)};
+
+  const fromLon =
+    ${JSON.stringify(fromLon)};
+
+  const toLat =
+    ${JSON.stringify(toLat)};
+
+  const toLon =
+    ${JSON.stringify(toLon)};
+
+  let progress =
+    ${JSON.stringify(progress)};
+
+  const depTime =
+    ${JSON.stringify(depMs)};
+
+  const totalHoursFixed =
+    ${JSON.stringify(totalHoursFixed)};
+
+  function shortestLon(
+    lon1,
+    lon2,
+    p
+  ){
+
+    let d =
+      lon2 - lon1;
+
+    if(d > 180){
+
+      d -= 360;
+
+    }
+
+    if(d < -180){
+
+      d += 360;
+
+    }
+
+    let cur =
+      lon1 +
+      d * p;
+
+    cur =
+      ((cur + 180) % 360 + 360) %
+      360 - 180;
+
+    return cur;
+
+  }
+
+  function getCurrentPosition(){
+
+    const curLat =
+      fromLat +
+      (
+        toLat -
+        fromLat
+      ) *
+      progress;
+
+    const curLon =
+      shortestLon(
+        fromLon,
+        toLon,
+        progress
+      );
+
+    return [
+      curLat,
+      curLon
+    ];
+
+  }
+
+  const currentPosition =
+    getCurrentPosition();
+
+  const map =
+    L.map(
+      "map",
+      {
+        worldCopyJump:true
+      }
+    ).setView(
+      currentPosition,
+      4
+    );
+
+  L.tileLayer(
+    "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    {
+      maxZoom:19,
+      attribution:
+        "© OpenStreetMap contributors © CARTO"
+    }
+  ).addTo(map);
+
+  L.polyline(
+    [
+      [
+        fromLat,
+        fromLon
+      ],
+      [
+        toLat,
+        toLon
+      ]
+    ],
+    {
+      color:"#38bdf8",
+      weight:4,
+      dashArray:"8,10"
+    }
+  ).addTo(map);
+
+  const traveledLine =
+    L.polyline(
+      [
+        [
+          fromLat,
+          fromLon
+        ],
+        currentPosition
+      ],
+      {
+        color:"#facc15",
+        weight:4
+      }
+    ).addTo(map);
+
+  L.marker(
+    [
+      fromLat,
+      fromLon
+    ]
+  )
+  .addTo(map)
+  .bindPopup(
+    ${JSON.stringify(
+      String(record.originCity || "") +
+      ", " +
+      String(record.originCountry || "")
+    )}
+  );
+
+  L.marker(
+    [
+      toLat,
+      toLon
+    ]
+  )
+  .addTo(map)
+  .bindPopup(
+    ${JSON.stringify(
+      String(record.destinationCity || "") +
+      ", " +
+      String(record.destinationCountry || "")
+    )}
+  );
+
+  const planeIcon =
+    L.divIcon({
+      className:
+        "skylink-plane-icon",
+
+      html:
+        "<div style='font-size:28px;transform:rotate(45deg);'>"+String.fromCodePoint(9992)+"</div>",
+
+      iconSize:
+        [
+          30,
+          30
+        ],
+
+      iconAnchor:
+        [
+          15,
+          15
+        ]
+    });
+
+  const planeMarker =
+    L.marker(
+      currentPosition,
+      {
+        icon:
+          planeIcon
+      }
+    ).addTo(map);
+
+  function fmt(ms){
+    var h=Math.floor(ms/3600000);
+    var m=Math.floor((ms%3600000)/60000);
+    var s=Math.floor((ms%60000)/1000);
+    return h+"h "+m+"m "+s+"s remaining";
+  }
+
+  function tick(){
+    var now=Date.now();
+    var elapsed=now-depTime;
+    var p=Math.min(0.99,Math.max(0,elapsed/(totalHoursFixed*3600000)));
+    var pos=[
+      fromLat+(toLat-fromLat)*p,
+      shortestLon(fromLon,toLon,p)
+    ];
+    planeMarker.setLatLng(pos);
+    traveledLine.setLatLngs([[fromLat,fromLon],pos]);
+    var remain=Math.max(0,totalHoursFixed*3600000-elapsed);
+    var el=document.getElementById("liveCountdown");
+    var pf=document.getElementById("pfill");
+    if(el){
+      if(remain>0){
+        el.textContent="In Transit - "+fmt(remain);
+      }else{
+        el.textContent="Arrived at Destination";
+        el.style.background="#0f2e6d";
+        el.style.color="#fff";
+      }
+    }
+    if(pf) pf.style.width=(p*100)+"%";
+  }
+
+  setInterval(tick,1000);
+  tick();
+
+  setInterval(
+    function(){
+
+      if(progress >= 1){
+
+        progress = 1;
+
+        return;
+
+      }
+
+      progress =
+        Math.min(
+          1,
+          progress + 0.00015
+        );
+
+    },
+    3000
+  );
+
+})();
+
+</scr`+`ipt>
+`
+    : `
+<div class="noMap">
+Route map coordinates are currently unavailable.
+</div>
+`;
+
+  const originTime =
+    formatDate(
+      record.createdAt,
+      record.originTimezone
+    );
+
+  const destinationTime =
+    formatDate(
+      new Date(
+        new Date(record.createdAt).getTime() +
+        totalHoursFixed*3600000
+      ),
+      record.destinationTimezone
+    );
+
+  res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="utf-8">
+
+<meta
+ name="viewport"
+ content="width=device-width,initial-scale=1">
+
+<title>
+Skylink Logistics Tracking
+</title>
+
+<style>
+
+*{
+ box-sizing:border-box;
+}
+
+body{
+ margin:0;
+ background:#fff;
+ font-family:Arial,Helvetica,sans-serif;
+ color:#111827;
+}
+
+.container{
+ width:100%;
+ max-width:800px;
+ margin:auto;
+ padding:16px;
+}
+
+.header{
+ border-bottom:2px solid #0f2e6d;
+ padding:10px 0 16px;
+}
+
+.logo{
+ font-size:22px;
+ font-weight:900;
+ color:#0f2e6d;
+}
+
+.logo span{
+ color:#facc15;
+}
+
+.sub{
+ font-size:10px;
+ color:#64748b;
+ margin-top:5px;
+ font-weight:800;
+ letter-spacing:.5px;
+}
+
+.tracking{
+ margin-top:18px;
+ font-size:13px;
+ font-weight:900;
+}
+
+.trackingCode{
+ margin-top:5px;
+ font-size:22px;
+ font-weight:900;
+ color:#0f2e6d;
+ word-break:break-word;
+}
+
+.status{
+ display:inline-block;
+ margin-top:14px;
+ padding:8px 12px;
+ border-radius:20px;
+ background:#dcfce7;
+ color:#166534;
+ font-size:11px;
+ font-weight:900;
+}
+
+.grid{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:12px;
+ margin-top:20px;
+}
+
+.card{
+ border:1px solid #e2e8f0;
+ border-radius:12px;
+ padding:14px;
+}
+
+.label{
+ font-size:9px;
+ font-weight:900;
+ color:#64748b;
+ text-transform:uppercase;
+ letter-spacing:.5px;
+}
+
+.value{
+ font-size:13px;
+ font-weight:800;
+ margin-top:5px;
+ line-height:1.4;
+ word-break:break-word;
+}
+
+.mapTitle{
+ margin-top:20px;
+ font-size:12px;
+ font-weight:900;
+ letter-spacing:0.5px;
+}
+
+#map{
+ width:100%;
+ height:420px;
+ margin-top:10px;
+ border-radius:14px;
+ border:1px solid #1e293b;
+ background:#0f172a;
+ overflow:hidden;
+}
+
+.skylink-plane-icon{
+ background:transparent;
+ border:0;
+ font-size:30px;
+ line-height:30px;
+ width:30px !important;
+ height:30px !important;
+ text-align:center;
+}
+
+.noMap{
+ margin-top:18px;
+ padding:20px;
+ background:#f8fafc;
+ border-radius:12px;
+ text-align:center;
+ color:#64748b;
+ font-size:12px;
+}
+
+.footer{
+ margin-top:20px;
+ padding-top:15px;
+ border-top:1px solid #e2e8f0;
+ text-align:center;
+ color:#94a3b8;
+ font-size:9px;
+}
+
+@media(max-width:600px){
+
+ .grid{
+   grid-template-columns:1fr;
+ }
+
+ #map{
+   height:420px;
+ }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="header">
+
+<div class="logo">
+SKYLINK <span>LOGISTICS</span>
+</div>
+
+<div class="sub">
+SHIPMENT TRACKING
+</div>
+
+</div>
+
+<div class="tracking">
+TRACKING NUMBER
+</div>
+
+<div class="trackingCode">
+${escapeHtml(record.tracking)}
+</div>
+
+<div class="status" style="background:#dcfce7;color:#16a34a;border:1px solid #86efac;">
+${escapeHtml(record.status)}
+</div>
+
+<div class="grid">
+
+<div class="card">
+
+<div class="label">
+From
+</div>
+
+<div class="value">
+${escapeHtml(record.originCity)},
+${escapeHtml(record.originCountry)}
+</div>
+
+<div
+ class="value"
+ style="font-size:11px;color:#64748b">
+${escapeHtml(
+  record.originAddress ||
+  "Address not provided"
+)}
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="label">
+To
+</div>
+
+<div class="value">
+${escapeHtml(record.destinationCity)},
+${escapeHtml(record.destinationCountry)}
+</div>
+
+<div
+ class="value"
+ style="font-size:11px;color:#64748b">
+${escapeHtml(
+  record.destinationAddress ||
+  "Address not provided"
+)}
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="label">
+Distance
+</div>
+
+<div class="value">
+${escapeHtml(distance)} km
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="label">
+Shipment
+</div>
+
+<div class="value">
+${escapeHtml(
+  record.packageDescription
+)}
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="label">
+Origin Local Time
+</div>
+
+<div class="value">
+${escapeHtml(originTime)}
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="label">
+Destination Local Time
+</div>
+
+<div class="value">
+${escapeHtml(destinationTime)}
+</div>
+
+</div>
+
+</div>
+
+${mapHTML}
+
+<div class="footer">
+Skylink Logistics Shipment Tracking
+</div>
+
+</div>
+
+</body>
+</html>
+`);
+
+}
 
 /*
 |--------------------------------------------------------------------------
