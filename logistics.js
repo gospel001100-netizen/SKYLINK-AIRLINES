@@ -2752,84 +2752,40 @@ async function trackingPage(req, res){
   const originTime = formatDate(record.createdAt, record.originTimezone);
   const destinationTime = formatDate(record.createdAt, record.destinationTimezone);
 
-  const mapHTML = hasMap ? `
+  const mapHTML = hasMap
+    ? `
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<div class="mapCard">
-<div class="liveHeader"><div class="liveLeft"><span class="pulse"></span><span id="liveText">${liveStatus}</span></div><div class="countdown" id="countdown">Calculating...</div></div>
+<div class="mapTitle">LIVE SHIPMENT STATUS + MAP COORDINATE VALIDATION</div>
 <div id="map"></div>
-<div class="progressBar"><div class="progressFill" id="progressFill" style="width:${progress*100}%"></div></div>
-</div>
+<div class="progressWrap"><div class="progressBar"><div class="progressFill" style="width:${progress*100}%"></div></div></div>
 <div class="steps">
-<div class="step ${progress==0?'active':''} ${progress>0?'completed':''}"><div class="ic">${progress>0?'✅':'📦'}</div><div class="tx">Booked</div></div>
-<div class="step ${progress>0 && progress<1?'active moving':''} ${progress>=1?'completed':''}"><div class="ic">🚚</div><div class="tx">In Transit</div></div>
+<div class="step ${progress>=0?'completed':''}"><div class="ic">✅</div><div class="tx">Booked</div></div>
+<div class="step ${progress>=0.5?'active moving':'booked'}"><div class="ic">🚚</div><div class="tx">In Transit</div></div>
 <div class="step ${progress>=1?'active':''}"><div class="ic">✅</div><div class="tx">Arrived</div></div>
 </div>
-  let progress=${JSON.stringify(progress)};
-  let depTime=${JSON.stringify(depTimeMs)};
-  let totalHours=${JSON.stringify(totalHours)};
-  let status=${JSON.stringify(liveStatus)};
-
-  function shortestLon(lon1,lon2,p){ let d=lon2-lon1; if(d>180)d-=360; if(d<-180)d+=360; let cur=lon1+d*p; cur=((cur+180)%360+360)%360-180; return cur; }
-  function getPos(p){ const lat=fromLat+(toLat-fromLat)*p; const lon=shortestLon(fromLon,toLon,p); return [lat,lon]; }
-  const currentPosition=getPos(progress);
-  const map=L.map("map",{worldCopyJump:true, zoomControl:true}).setView(currentPosition,3);
-  
-  // FIXED TILE - NO API KEY NEEDED - SHOWS COUNTRIES CLEARLY
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-    maxZoom:19,
-    attribution:"© OpenStreetMap"
-  }).addTo(map);
-
-  L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:"#94a3b8",weight:2,dashArray:"10,10",opacity:0.8}).addTo(map);
-  const traveledLine=L.polyline([[fromLat,fromLon],currentPosition],{color:"#0f2e6d",weight:4}).addTo(map);
-  L.marker([fromLat,fromLon]).addTo(map).bindPopup("FROM: ${String(record.originCity||"").replace(/"/g,'')}");
-  L.marker([toLat,toLon]).addTo(map).bindPopup("TO: ${String(record.destinationCity||"").replace(/"/g,'')}");
-  const planeIcon=L.divIcon({className:"plane-icon",html:"✈️",iconSize:[36,36],iconAnchor:[18,18]});
-  const planeMarker=L.marker(currentPosition,{icon:planeIcon}).addTo(map);
-  
-  function updatePlane(){
-    const pos=getPos(progress);
-    planeMarker.setLatLng(pos);
-    traveledLine.setLatLngs([[fromLat,fromLon],pos]);
-    document.getElementById("progressFill").style.width=(progress*100)+"%";
-  }
-  function formatHMS(ms){
-    if(ms<=0) return "0h 0m";
-    const h=Math.floor(ms/3600000);
-    const m=Math.floor((ms%3600000)/60000);
-    if(h>24){ const d=Math.floor(h/24); return d+"d "+(h%24)+"h "+m+"m"; }
-    return h+"h "+m+"m";
-  }
-  function updateCountdown(){
-    const now=Date.now();
-    const diff=now-depTime;
-    const el=document.getElementById("countdown");
-    const live=document.getElementById("liveText");
-    if(diff<0){
-      const remain=Math.abs(diff);
-      el.innerHTML="⏳ Cargo starts moving in <b>"+formatHMS(remain)+"</b>";
-      live.textContent="Shipment Booked";
-      progress=0;
-    } else if(diff/3600000 < totalHours){
-      const remain=(totalHours*3600000)-diff;
-      el.innerHTML="🚚 Live in transit — <b>"+formatHMS(diff)+"</b> elapsed — Arriving in <b>"+formatHMS(remain)+"</b>";
-      live.textContent="In Transit - Cargo Moving";
-      progress=Math.min(0.99, (diff/3600000)/totalHours);
-    } else {
-      el.innerHTML="✅ Delivered — Total transit <b>"+formatHMS(totalHours*3600000)+"</b>";
-      live.textContent="Arrived at Destination";
-      progress=1;
-    }
-    updatePlane();
-  }
-  updateCountdown();
-  updatePlane();
-  setTimeout(function(){ map.invalidateSize(); }, 600);
-  setInterval(updateCountdown, 1000);
-  setInterval(function(){ if(progress<1) progress=Math.min(1, progress+0.00008); updatePlane(); }, 3000);
-})();
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<script>
+const fromLat=${Number(record.originLat)};
+const fromLon=${Number(record.originLon)};
+const toLat=${Number(record.destinationLat)};
+const toLon=${Number(record.destinationLon)};
+const depTime=1791051120000;
+const totalHours=20.02;
+let progress=${progress};
+function shortestLon(l1,l2){let d=l2-l1; if(d>180)d-=360; if(d<-180)d+=360; return l1+d*progress; }
+function getPos(p){ const lat=fromLat+(toLat-fromLat)*p; const lon=shortestLon(fromLon,toLon); return [lat,lon]; }
+const currentPosition=getPos(progress);
+const map=L.map('map',{zoomControl:true}).setView(currentPosition,3);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
+const line=L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:'#94a3b8',weight:2,dashArray:'10,10',opacity:0.8}).addTo(map);
+const traveledLine=L.polyline([[fromLat,fromLon],currentPosition],{color:'#0f2e6d',weight:4}).addTo(map);
+L.marker([fromLat,fromLon]).addTo(map).bindPopup('FROM: ${record.originCity}');
+L.marker([toLat,toLon]).addTo(map).bindPopup('TO: ${record.destinationCity}');
+L.marker(currentPosition).addTo(map);
 <\/script>
-` : `<div class="noMap">🗺️ Route coordinates not available</div>`;
+`
+    : '<div class="noMap">Route map coordinates are currently unavailable.</div>';
 
   res.send(`
 <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
