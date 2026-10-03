@@ -2812,15 +2812,12 @@ async function trackingPage(req, res){
   const mapHTML = hasMap
     ? `
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-
 <div style="margin-top:18px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
 <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;gap:8px;">
 <span style="font-size:11px;font-weight:900;letter-spacing:.6px;color:#0f2e6d;">LIVE SHIPMENT STATUS + MAP COORDINATE VALIDATION</span>
 <span id="liveCountdown" style="background:#dcfce7;color:#16a34a;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:900;border:1px solid #86efac;">Calculating...</span>
 </div>
-
 <div id="map" style="width:100%;height:380px;background:#eef2ff;"></div>
-
 <div style="padding:10px 14px;">
 <div style="display:flex;justify-content:space-between;font-size:10px;color:#64748b;font-weight:700;margin-bottom:6px;">
 <span>FROM</span><span>IN AIR</span><span>TO</span>
@@ -2830,19 +2827,18 @@ async function trackingPage(req, res){
 </div>
 </div>
 </div>
-
 <scr`+`ipt src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></scr`+`ipt>
-
 <scr`+`ipt>
 (function(){
   const fromLat=${JSON.stringify(fromLat)};
   const fromLon=${JSON.stringify(fromLon)};
   const toLat=${JSON.stringify(toLat)};
   const toLon=${JSON.stringify(toLon)};
+  const fromLabel=${JSON.stringify(String(record.originCity||"")+", "+String(record.originCountry||""))};
+  const toLabel=${JSON.stringify(String(record.destinationCity||"")+", "+String(record.destinationCountry||""))};
   let progress=${JSON.stringify(progress)};
   const depTime=${JSON.stringify(depMs)};
   const totalHoursFixed=${JSON.stringify(totalHoursFixed)};
-
   function shortestLon(lon1,lon2,p){
     let d=lon2-lon1;
     if(d>180){d-=360;}
@@ -2851,43 +2847,24 @@ async function trackingPage(req, res){
     cur=((cur+180)%360+360)%360-180;
     return cur;
   }
-
   function getPos(p){
     return [fromLat+(toLat-fromLat)*p, shortestLon(fromLon,toLon,p)];
   }
-
   const currentPosition=getPos(progress);
-
   const map=L.map("map",{worldCopyJump:true}).setView(currentPosition,3);
-
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-    maxZoom:19,
-    attribution:"© OpenStreetMap"
-  }).addTo(map);
-
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
   L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:"#94a3b8",weight:2,dashArray:"8,10"}).addTo(map);
-
   const traveledLine=L.polyline([[fromLat,fromLon],currentPosition],{color:"#0f2e6d",weight:4}).addTo(map);
-
-  L.marker([fromLat,fromLon]).addTo(map).bindPopup(${JSON.stringify(String(record.originCity||"")+", "+String(record.originCountry||"")).replace(/"/g,'')});
-  L.marker([toLat,toLon]).addTo(map).bindPopup(${JSON.stringify(String(record.destinationCity||"")+", "+String(record.destinationCountry||"")).replace(/"/g,'')});
-
-  const planeIcon=L.divIcon({
-    className:"skylink-plane-icon",
-    html:"<div style='font-size:26px;transform:rotate(45deg);filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4))'>"+String.fromCodePoint(9992)+"</div>",
-    iconSize:[30,30],
-    iconAnchor:[15,15]
-  });
-
+  L.marker([fromLat,fromLon]).addTo(map).bindPopup(fromLabel);
+  L.marker([toLat,toLon]).addTo(map).bindPopup(toLabel);
+  const planeIcon=L.divIcon({className:"skylink-plane-icon",html:"<div style='font-size:26px;transform:rotate(45deg);filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4))'>"+String.fromCodePoint(9992)+"</div>",iconSize:[30,30],iconAnchor:[15,15]});
   const planeMarker=L.marker(currentPosition,{icon:planeIcon}).addTo(map);
-
   function fmt(ms){
     var h=Math.floor(ms/3600000);
     var m=Math.floor((ms%3600000)/60000);
     var s=Math.floor((ms%60000)/1000);
     return h+"h "+m+"m "+s+"s remaining";
   }
-
   function tick(){
     var now=Date.now();
     var elapsed=now-depTime;
@@ -2910,7 +2887,6 @@ async function trackingPage(req, res){
     }
     if(pf){ pf.style.width=(p*100)+"%"; }
   }
-
   setInterval(tick,1000);
   tick();
   setTimeout(function(){ map.invalidateSize(); }, 300);
@@ -2918,7 +2894,7 @@ async function trackingPage(req, res){
 </scr`+`ipt>
 `
     : `<div style="margin-top:18px;padding:20px;background:#f8fafc;border-radius:12px;text-align:center;color:#64748b;font-size:12px;">Route map coordinates are currently unavailable.</div>`;
-
+  
   let originTime = "";
   try{ originTime = formatDate(record.createdAt, record.originTimezone); }catch(e){ originTime = String(record.createdAt); }
 
