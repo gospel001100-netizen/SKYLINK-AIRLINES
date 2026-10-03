@@ -2871,11 +2871,6 @@ async function trackingPage(req, res){
 <div class="header"><div class="logo">SKYLINK <span>LOGISTICS</span></div><div class="badge">LIVE TRACKING</div></div>
 <div class="trackBox"><div class="trLabel">TRACKING NUMBER</div><div class="trCode">${escapeHtml(record.tracking)}</div></div>
 ${mapHTML}
-<div class="steps">
-<div class="step ${progress>=0?'active':''}"><div class="ic">📦</div><div class="tx">Booked</div></div>
-<div class="step ${progress>0 && progress<1?'active':''}"><div class="ic">🚚</div><div class="tx">In Transit</div></div>
-<div class="step ${progress>=1?'active':''}"><div class="ic">✅</div><div class="tx">Arrived</div></div>
-</div>
 <div class="grid">
 <div class="card"><div class="ico">📍</div><div><div class="label">From</div><div class="value">${escapeHtml(record.originCity)}, ${escapeHtml(record.originCountry)}</div><div class="subVal">${escapeHtml(record.originAddress||"")}</div></div></div>
 <div class="card"><div class="ico">🎯</div><div><div class="label">To</div><div class="value">${escapeHtml(record.destinationCity)}, ${escapeHtml(record.destinationCountry)}</div><div class="subVal">${escapeHtml(record.destinationAddress||"")}</div></div></div>
