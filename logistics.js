@@ -2752,39 +2752,55 @@ async function trackingPage(req, res){
   const originTime = formatDate(record.createdAt, record.originTimezone);
   const destinationTime = formatDate(record.createdAt, record.destinationTimezone);
 
+  const depMs = new Date(record.createdAt).getTime();
+  const totalMs = 20.02 * 3600000;
+  const nowMs = Date.now();
+  const elapsedMs = nowMs - depMs;
+  const remainingMs = Math.max(0, totalMs - elapsedMs);
+  const progress = Math.min(0.99, Math.max(0.02, elapsedMs / totalMs));
+
   const mapHTML = hasMap
     ? `
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<div class="mapTitle">LIVE SHIPMENT STATUS + MAP COORDINATE VALIDATION</div>
-<div id="map"></div>
-<div class="progressWrap"><div class="progressBar"><div class="progressFill" style="width:${progress*100}%"></div></div></div>
+<div class="mapTitle">LIVE SHIPMENT STATUS + MAP COORDINATE VALIDATION <span id="liveCountdown" style="float:right;background:#dcfce7;color:#16a34a;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:900;">Calculating...</span></div>
+<div id="map" style="height:380px;border-radius:12px;"></div>
+<div class="progressWrap"><div class="progressBar"><div class="progressFill" id="pfill" style="width:${progress*100}%"></div></div></div>
+<div class="steps">
 <div class="step completed"><div class="ic">✅</div><div class="tx">Booked</div></div>
 <div class="step active moving"><div class="ic">🚚</div><div class="tx">In Transit</div></div>
 <div class="step"><div class="ic">✅</div><div class="tx">Arrived</div></div>
+</div>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
 <script>
-const fromLat=${Number(record.originLat)};
-const fromLon=${Number(record.originLon)};
-const toLat=${Number(record.destinationLat)};
-const toLon=${Number(record.destinationLon)};
-const depTime=1791051120000;
-const totalHours=20.02;
-let progress=${progress};
-function shortestLon(l1,l2){let d=l2-l1; if(d>180)d-=360; if(d<-180)d+=360; return l1+d*progress; }
-function getPos(p){ const lat=fromLat+(toLat-fromLat)*p; const lon=shortestLon(fromLon,toLon); return [lat,lon]; }
-const currentPosition=getPos(progress);
-const map=L.map('map',{zoomControl:true}).setView(currentPosition,3);
+var fromLat=${Number(record.originLat)};
+var fromLon=${Number(record.originLon)};
+var toLat=${Number(record.destinationLat)};
+var toLon=${Number(record.destinationLon)};
+var depTime=${depMs};
+var totalHours=20.02;
+var progressNow=${progress};
+function getPos(p){ var lat=fromLat+(toLat-fromLat)*p; var d=toLon-fromLon; if(d>180)d-=360; if(d<-180)d+=360; var lon=fromLon+d*p; return [lat,lon]; }
+var map=L.map('map').setView(getPos(progressNow),3);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
-const line=L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:'#94a3b8',weight:2,dashArray:'10,10',opacity:0.8}).addTo(map);
-const traveledLine=L.polyline([[fromLat,fromLon],currentPosition],{color:'#0f2e6d',weight:4}).addTo(map);
+var line=L.polyline([[fromLat,fromLon],[toLat,toLon]],{color:'#94a3b8',weight:2,dashArray:'10,10'}).addTo(map);
+var traveled=L.polyline([[fromLat,fromLon],getPos(progressNow)],{color:'#0f2e6d',weight:4}).addTo(map);
+var planeIcon=L.divIcon({html:'<div style=font-size:28px;transform:rotate(45deg)>✈️</div>',iconSize:[30,30],className:''});
+var plane=L.marker(getPos(progressNow),{icon:planeIcon}).addTo(map);
 L.marker([fromLat,fromLon]).addTo(map).bindPopup('FROM: ${record.originCity}');
 L.marker([toLat,toLon]).addTo(map).bindPopup('TO: ${record.destinationCity}');
-L.marker(currentPosition).addTo(map);
+function fmt(ms){ var h=Math.floor(ms/3600000); var m=Math.floor((ms%3600000)/60000); var s=Math.floor((ms%60000)/1000); return h+'h '+m+'m '+s+'s remaining'; }
+function tick(){
+  var now=Date.now(); var elapsed=now-depTime; var p=Math.min(0.99,Math.max(0,elapsed/(totalHours*3600000)));
+  var pos=getPos(p); plane.setLatLng(pos); traveled.setLatLngs([[fromLat,fromLon],pos]);
+  var remain=Math.max(0,totalHours*3600000-elapsed);
+  var el=document.getElementById('liveCountdown'); if(el) el.innerText='In Transit - '+fmt(remain);
+  var pf=document.getElementById('pfill'); if(pf) pf.style.width=(p*100)+'%';
+}
+setInterval(tick,1000);
+tick();
 <\/script>
 `
-    : '<div class="noMap">Route map coordinates are currently unavailable.</div>';
-
+    : '<div class="noMap">Route map unavailable</div>';
   res.send(`
 <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Skylink Tracking - ${escapeHtml(record.tracking)}</title>
