@@ -2749,8 +2749,8 @@ async function trackingPage(req, res){
   progress = Math.min(1, Math.max(0, Number.isFinite(progress)?progress:0));
   record.status = liveStatus;
 
-  const originTime = formatDate(record.createdAt, record.originTimezone);
-  const destinationTime = formatDate(record.createdAt, record.destinationTimezone);
+  const originTime = formatDate(record.createdAt);
+  const destinationTime = formatDate(new Date(new Date(record.createdAt).getTime() + 20.02*3600000));
 
   const depMs = new Date(record.createdAt).getTime();
   const totalMs = 20.02 * 3600000;
@@ -2759,8 +2759,7 @@ async function trackingPage(req, res){
   const remainingMs = Math.max(0, totalMs - elapsedMs);
   const progress = Math.min(0.99, Math.max(0.02, elapsedMs / totalMs));
 
-  const mapHTML = hasMap
-    ? `
+  const mapHTML = hasMap ? `
 <div class="mapTitle">LIVE SHIPMENT STATUS + MAP COORDINATE VALIDATION <span id="liveCountdown" style="float:right;background:#dcfce7;color:#16a34a;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:900;">Calculating...</span></div>
 <div id="map" style="height:380px;border-radius:12px;"></div>
 <div class="progressWrap"><div class="progressBar"><div class="progressFill" id="pfill" style="width:${progress*100}%"></div></div></div>
@@ -2799,9 +2798,7 @@ function tick(){
 setInterval(tick,1000);
 tick();
 <\/script>
-`
-    : '<div class="noMap">Route map unavailable</div>';
-  
+` : '<div class="noMap">Route map unavailable</div>';
   res.send(`
 <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Skylink Tracking - ${escapeHtml(record.tracking)}</title>
