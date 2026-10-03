@@ -127,6 +127,8 @@ const AIRPORTS = [
   {code:"PVG", city:"Shanghai", country:"China", name:"Pudong", tz:"Asia/Shanghai", lat:31.143, lon:121.805},
   {code:"SYD", city:"Sydney", country:"Australia", name:"Sydney", tz:"Australia/Sydney", lat:-33.939, lon:151.175},
   {code:"AKL", city:"Auckland", country:"New Zealand", name:"Auckland Intl", tz:"Pacific/Auckland", lat:-37.008, lon:174.791},
+  {code:"SVO", city:"Moscow", country:"Russia", name:"Sheremetyevo International Airport"},
+  {code:"DAM", city:"Damascus", country:"Syria", name:"Damascus International Airport"},
 ];
 function haversine(lat1, lon1, lat2, lon2){ const R=6371; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180; const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(a)); }
 function getFlightDetails(from, to){
