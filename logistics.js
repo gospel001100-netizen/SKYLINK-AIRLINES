@@ -2086,7 +2086,7 @@ async function receipt(req, res){
 <title>
 Skylink Logistics Receipt ${escapeHtml(record.tracking)}
 </title>
-
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
 
 *{
@@ -2602,80 +2602,25 @@ function openTracking(){
 
 }
 
-function downloadReceipt(){
-
- /*
-  The downloaded document contains no service price.
-  It opens as a standalone HTML receipt that can be
-  saved on the phone.
- */
-
- const receipt =
-   document.getElementById("receipt");
-
- const clone =
-   receipt.cloneNode(true);
-
- clone
-   .querySelectorAll(".actions,.message")
-   .forEach(function(x){
-     x.remove();
-   });
-
- const html =
- '<!DOCTYPE html>' +
- '<html><head>' +
- '<meta charset="utf-8">' +
- '<meta name="viewport" content="width=device-width,initial-scale=1">' +
- '<title>Skylink Logistics Receipt</title>' +
- '<style>' +
- 'body{font-family:Arial;margin:20px;background:#fff;color:#111827}' +
- '.receipt{max-width:760px;margin:auto;border:1px solid #ddd;border-radius:15px;overflow:hidden}' +
- '.header{background:#0f2e6d;color:white;padding:20px}' +
- '.logo{font-size:22px;font-weight:900}' +
- '.logo span{color:#facc15}' +
- '.body{padding:20px}' +
- '.item{border:1px solid #ddd;padding:12px;margin-bottom:10px;border-radius:8px}' +
- '.label{font-size:9px;font-weight:900;color:#64748b}' +
- '.value{font-size:13px;font-weight:800;margin-top:4px}' +
- '</style>' +
- '</head><body>' +
- clone.outerHTML +
- '</body></html>';
-
- const blob =
-   new Blob(
-     [html],
-     {type:"text/html"}
-   );
-
- const url =
-   URL.createObjectURL(blob);
-
- const a =
-   document.createElement("a");
-
- a.href = url;
-
- a.download =
-   "Skylink-Logistics-" +
-   ${JSON.stringify(record.tracking)} +
-   "-Receipt.html";
-
- document.body.appendChild(a);
-
- a.click();
-
- a.remove();
-
- setTimeout(function(){
-   URL.revokeObjectURL(url);
- },1000);
-
- showMessage(
-   "Receipt saved."
- );
-
+async function downloadReceipt(){
+  const r = document.getElementById("receipt");
+  if(!r) return;
+  const aBtn = r.querySelector(".actions");
+  if(aBtn) aBtn.style.display = "none";
+  try{
+    const canvas = await html2canvas(r, {scale:2, backgroundColor:"#ffffff", useCORS:true});
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = "SKYLINK OFFICIAL RECEIPT - " + trackingLink.split('/').pop() + ".png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showMessage("Receipt saved as paper image.");
+  }catch(e){
+    window.print();
+  }finally{
+    if(aBtn) setTimeout(function(){ aBtn.style.display="flex"; }, 1000);
+  }
 }
 
 <\/script>
