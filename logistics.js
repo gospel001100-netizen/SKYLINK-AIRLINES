@@ -2758,11 +2758,9 @@ async function trackingPage(req, res){
 <div class="mapTitle">LIVE SHIPMENT STATUS + MAP COORDINATE VALIDATION</div>
 <div id="map"></div>
 <div class="progressWrap"><div class="progressBar"><div class="progressFill" style="width:${progress*100}%"></div></div></div>
-<div class="steps">
-<div class="step ${progress>=0?'completed':''}"><div class="ic">✅</div><div class="tx">Booked</div></div>
-<div class="step ${progress>=0.5?'active moving':'booked'}"><div class="ic">🚚</div><div class="tx">In Transit</div></div>
-<div class="step ${progress>=1?'active':''}"><div class="ic">✅</div><div class="tx">Arrived</div></div>
-</div>
+<div class="step completed"><div class="ic">✅</div><div class="tx">Booked</div></div>
+<div class="step active moving"><div class="ic">🚚</div><div class="tx">In Transit</div></div>
+<div class="step"><div class="ic">✅</div><div class="tx">Arrived</div></div>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
 <script>
