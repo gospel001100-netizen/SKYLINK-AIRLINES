@@ -2801,6 +2801,7 @@ tick();
 <\/script>
 `
     : '<div class="noMap">Route map unavailable</div>';
+  
   res.send(`
 <!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Skylink Tracking - ${escapeHtml(record.tracking)}</title>
