@@ -2925,9 +2925,15 @@ async function trackingPage(req, res){
   let destinationTime = "";
   try{
     const destDate = new Date(new Date(record.createdAt).getTime() + totalHoursFixed*3600000);
-    destinationTime = formatDate(destDate, record.destinationTimezone || record.originTimezone);
+    let tz = record.destinationTimezone;
+    if(!tz || tz==="Australia/Syd"){ tz = "Australia/Sydney"; }
+    destinationTime = formatDate(destDate, tz);
+    if(!destinationTime || destinationTime.includes("Invalid")){
+      destinationTime = destDate.toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})+" GMT+11";
+    }
   }catch(e){
-    destinationTime = new Date(new Date(record.createdAt).getTime() + totalHoursFixed*3600000).toUTCString();
+    const destDate = new Date(new Date(record.createdAt).getTime() + totalHoursFixed*3600000);
+    destinationTime = destDate.toUTCString();
   }
 
   res.send(`
