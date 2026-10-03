@@ -2759,11 +2759,11 @@ async function trackingPage(req, res){
 <div id="map"></div>
 <div class="progressBar"><div class="progressFill" id="progressFill" style="width:${progress*100}%"></div></div>
 </div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
-<script>
-(function(){
-  const fromLat=${JSON.stringify(fromLat)}; const fromLon=${JSON.stringify(fromLon)};
-  const toLat=${JSON.stringify(toLat)}; const toLon=${JSON.stringify(toLon)};
+<div class="steps">
+<div class="step ${progress==0?'active':''} ${progress>0?'completed':''}"><div class="ic">${progress>0?'✅':'📦'}</div><div class="tx">Booked</div></div>
+<div class="step ${progress>0 && progress<1?'active moving':''} ${progress>=1?'completed':''}"><div class="ic">🚚</div><div class="tx">In Transit</div></div>
+<div class="step ${progress>=1?'active':''}"><div class="ic">✅</div><div class="tx">Arrived</div></div>
+</div>
   let progress=${JSON.stringify(progress)};
   let depTime=${JSON.stringify(depTimeMs)};
   let totalHours=${JSON.stringify(totalHours)};
@@ -2852,7 +2852,11 @@ async function trackingPage(req, res){
 .progressBar{height:6px;background:#e2e8f0}.progressFill{height:100%;background:linear-gradient(90deg,#0f2e6d,#3b82f6);transition:width 1s}
 .steps{display:flex;gap:10px;margin-top:14px}
 .step{flex:1;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;text-align:center}
-.step.active{border-color:#0f2e6d;background:#eff6ff}
+.step.active{background:#16a34a !important; color:#fff !important; border-color:#16a34a !important}
+.step.completed{background:#dcfce7 !important}
+.step.completed .tx{color:#16a34a !important; font-weight:700}
+.step.moving .ic{animation:truckMove 1s infinite alternate}
+@keyframes truckMove{0%{transform:translateX(-4px)}100%{transform:translateX(4px)}}
 .step .ic{font-size:20px}.step .tx{font-size:10px;font-weight:900;margin-top:4px;color:#64748b}.step.active .tx{color:#0f2e6d}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
 .card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;display:flex;gap:12px}
