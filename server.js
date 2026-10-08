@@ -297,6 +297,10 @@ const AIRPORTS = [
 {code:"CRW", city:"Charleston", country:"USA", name:"Yeager Airport", tz:"America/New_York", lat:38.373, lon:-81.593},
 {code:"MKE", city:"Milwaukee", country:"USA", name:"Mitchell Intl", tz:"America/Chicago", lat:42.947, lon:-87.896},
 {code:"JAC", city:"Jackson", country:"USA", name:"Jackson Hole", tz:"America/Denver", lat:43.607, lon:-110.737},
+{code:"DCA", city:"Arlington", country:"USA", name:"Ronald Reagan Washington National", tz:"America/New_York", lat:38.851, lon:-77.037},
+{code:"IAD", city:"Arlington", country:"USA", name:"Washington Dulles Intl", tz:"America/New_York", lat:38.953, lon:-77.456},
+{code:"BWI", city:"Arlington", country:"USA", name:"Baltimore Washington Intl", tz:"America/New_York", lat:39.177, lon:-76.668},
+{code:"HEF", city:"Arlington", country:"USA", name:"Manassas Regional", tz:"America/New_York", lat:38.721, lon:-77.515},
 ];
 function haversine(lat1, lon1, lat2, lon2){ const R=6371; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180; const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(a)); }
 function getFlightDetails(from, to){
